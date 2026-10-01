@@ -5,13 +5,10 @@ A two-screen web app for running custom spelling bees. Open the **TV Display** o
 ## Quick Start
 
 ```bash
-# 1. Create the database (one-time)
-make db-create
-
-# 2. Build and start
+# 1. Start locally (opens an SSH tunnel to the droplet DB)
 make up
 
-# 3. Open in browser
+# 2. Open in browser
 # Setup:      http://localhost:8003/static/setup.html
 # Controller: http://localhost:8003/static/control.html  (phone)
 # TV Display: http://localhost:8003/static/display.html?session=SESSION_ID  (TV)
@@ -34,6 +31,10 @@ make up
 - 📊 **Scoreboard** with elimination tracking
 - 🤖 **AI-friendly setup** — bulk import words via JSON
 
+## Deployment
+
+Deployed at **http://143.244.162.12:8003/** on the shared droplet. Commit and push to `main`, then run `make deploy`.
+
 ## Bulk Word Import Format
 
 ```json
@@ -46,9 +47,24 @@ make up
     "language_of_origin": "Greek",
     "difficulty": 3,
     "player_name": "Alice"
+  },
+  {
+    "word": "apiary",
+    "definition": "a place where bees are kept",
+    "difficulty": 3,
+    "team_name": "Honeybees"
   }
 ]
 ```
+
+Use `player_name` to give a word to one player, `team_name` to put it in a team's pool, or neither for the shared session pool.
+
+## Example Data
+
+`make seed` creates two demo sessions (safe to re-run; existing ones are skipped):
+
+- **Example: Team Bee** — Honeybees vs Bumblebees, 4 players with bios, player words, team-pool words, and a shared tiebreaker pool
+- **Example: Classroom Elimination Bee** — 3 solo players, elimination mode, 60s timer, 4th-grade word pool
 
 ## Tech Stack
 
@@ -61,11 +77,13 @@ make up
 
 | Command | Description |
 |---------|-------------|
-| `make up` | Build and start the app |
-| `make down` | Stop the app |
-| `make logs` | View container logs |
-| `make restart` | Restart the container |
-| `make shell` | Open a shell in the backend container |
-| `make db-create` | Create the `spellingbee` database |
-| `make db-shell` | Open a psql shell to the database |
+| `make up` | Open the DB tunnel and run the app locally with reload on :8003 |
+| `make down` | Stop the local app |
+| `make tunnel` | Open the SSH tunnel to the droplet DB on :5433 |
 | `make migrate` | Run database migrations |
+| `make seed` | Migrate, then add example sessions (`backend/seed_examples.py`) |
+| `make db-shell` | Open a psql shell to the database |
+| `make db-status` | List tables in the deployed database |
+| `make deploy` | Pull `origin/main` on the droplet and rebuild the container |
+| `make logs` | Tail the deployed container's logs |
+| `make restart` | Restart the deployed container |
