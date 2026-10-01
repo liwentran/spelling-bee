@@ -76,6 +76,12 @@
                 <button id="btn-timer-pause" class="bg-yellow-600 w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-lg active:scale-95 transition-transform">⏸</button>
                 <button id="btn-timer-reset" class="bg-gray-600 w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-lg active:scale-95 transition-transform">↺</button>
             </div>
+            <div class="flex items-center justify-center gap-3 mt-4 text-sm">
+                <span class="text-gray-400">Time per word</span>
+                <button id="btn-timer-minus" class="bg-gray-700 px-3 py-2 rounded-lg font-bold active:scale-95 transition-transform disabled:opacity-40">−15s</button>
+                <span id="timer-length" class="font-mono font-bold w-12">2:00</span>
+                <button id="btn-timer-plus" class="bg-gray-700 px-3 py-2 rounded-lg font-bold active:scale-95 transition-transform disabled:opacity-40">+15s</button>
+            </div>
         </div>
 
         <!-- Reveal Info -->
@@ -251,14 +257,22 @@
 
             document.getElementById('btn-pronounce').disabled = !s.current_word_id;
 
-            renderPlayers();
-            renderWords();
+            // Timer ticks arrive every second; only rebuild the lists when something else changed
+            const { timer_running, timer_seconds_remaining, timer_duration, ...listState } = s;
+            const listKey = JSON.stringify(listState);
+            if (listKey !== lastListKey) {
+                lastListKey = listKey;
+                renderPlayers();
+                renderWords();
+            }
         }
+        let lastListKey = null;
 
         // --- Timer Logic (runs on controller, syncs to display via WS) ---
         function startLocalTimer() {
             if (timerRunning) return;
             timerRunning = true;
+            updateTimerDisplay(); // disables the length buttons right away
             timerInterval = setInterval(() => {
                 timerSeconds = Math.max(0, timerSeconds - 1);
                 ws.updateTimer(timerSeconds);
@@ -274,9 +288,31 @@
         function stopTimer() {
             timerRunning = false;
             clearInterval(timerInterval);
+            updateTimerDisplay();
         }
 
+        const fmtTime = (secs) => `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
+
+        // Change the session's time per word (saved, so the TV and future visits use it). Resets the clock.
+        async function changeTimerLength(delta) {
+            if (timerRunning) return;
+            const next = Math.min(600, Math.max(15, timerDuration + delta));
+            if (next === timerDuration) return;
+            timerDuration = next;
+            timerSeconds = next;
+            ws.resetTimer(next);
+            updateTimerDisplay();
+            try { await api.updateSession(dom.select.value, { timer_duration_seconds: next }); }
+            catch (e) { console.error('Failed to save timer length:', e); }
+        }
+        document.getElementById('btn-timer-minus').onclick = () => changeTimerLength(-15);
+        document.getElementById('btn-timer-plus').onclick = () => changeTimerLength(15);
+
         function updateTimerDisplay() {
+            document.getElementById('timer-length').textContent = fmtTime(timerDuration);
+            // Length can't change mid-countdown
+            document.getElementById('btn-timer-minus').disabled = timerRunning;
+            document.getElementById('btn-timer-plus').disabled = timerRunning;
             const m = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
             const s = (timerSeconds % 60).toString().padStart(2, '0');
             dom.timerDisplay.textContent = `${m}:${s}`;

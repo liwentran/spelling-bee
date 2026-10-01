@@ -1,4 +1,4 @@
-.PHONY: up down tunnel db-status run migrate seed db-shell deploy logs restart
+.PHONY: up dev down tunnel db-status run migrate seed db-shell deploy logs restart
 
 tunnel:
 	@if lsof -Pi :5433 -sTCP:LISTEN -t >/dev/null ; then \
@@ -25,6 +25,8 @@ seed: migrate
 up: tunnel
 	@echo "🚀 Starting backend server on http://0.0.0.0:8003..."
 	cd backend && uv run uvicorn main:app --host 0.0.0.0 --port 8003 --reload
+
+dev: up  ## alias for `make up`
 
 down:
 	@pkill -f "uvicorn main:app --host 0.0.0.0 --port 8003" || true

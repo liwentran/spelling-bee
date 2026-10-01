@@ -37,7 +37,7 @@ frontend/
 
 The DB is Postgres on a remote droplet (`general-db`), reached through an SSH tunnel on port 5433. `backend/.env` holds `DATABASE_URL`.
 
-- `make up`: opens the tunnel and runs uvicorn with reload on :8003. The app is at http://localhost:8003/.
+- `make up` (alias `make dev`): opens the tunnel and runs uvicorn with reload on :8003. The app is at http://localhost:8003/. Only this local server picks up edits automatically. The droplet (http://143.244.162.12:8003) changes only after push + `make deploy`, so a missing feature there usually means "not deployed".
 - `make migrate`: runs `alembic upgrade head` against the tunneled DB. Migrations also run automatically on app startup.
 - `make seed`: migrates, then runs `backend/seed_examples.py`, which upserts two example sessions (a team-mode bee and a solo elimination bee) through `import_roster`. Rerunning it updates them in place. Use these sessions for manual testing, and extend the script when you add features worth demoing.
 - `make db-shell` / `make db-status`: psql on the droplet.
@@ -61,7 +61,7 @@ The app is deployed at **http://143.244.162.12:8003/**, with no domain and no HT
 
 - Caddy (`/etc/caddy/Caddyfile`) proxies `api.liwentran.com` → :8000 and `eats.liwentran.com` → :8001. Spelling bee isn't behind Caddy. If it ever gets a domain, add a block there; Caddy proxies WebSockets automatically, and `ws.js` switches to `wss:` under https.
 - `general-db` doesn't publish 5432. Locally you reach it through the tunnel `ssh -L 5433:172.18.0.3:5432 droplet` (`make tunnel`).
-- Backups: root cron runs `/root/cafe/backup_db.sh` at 3:00 AM. It dumps **every database** in `general-db` (`<db>_db_<ts>.dump`, plus `globals_<ts>.sql` for roles) to `/root/cafe/backups` (kept 7 days) and `gs://liwentran.com/db_backups/`. The script's source copy is `~/Developer/wyomb-cafe/backup_db.sh`, which isn't tracked in git.
+- Backups: root cron runs `/root/cafe/backup_db.sh` at 3:00 AM. It dumps **every database** in `general-db` (`<db>_db_<ts>.dump`, plus `globals_<ts>.sql` for roles) to `/root/cafe/backups` (kept 7 days) and `gs://liwentran.com/db_backups/` (console: https://console.cloud.google.com/storage/browser/liwentran.com/db_backups). The script's source copy is `~/Developer/wyomb-cafe/backup_db.sh`, which isn't tracked in git.
 - The wyomb-cafe repo (`~/Developer/wyomb-cafe`) is the cafe app: FastAPI + SvelteKit, with its frontend on Vercel at coffee.liwentran.com.
 
 **Deploying this app.** Push to `origin/main` (https://github.com/liwentran/spelling-bee, public), then run `make deploy`. It refuses to run if the tree is dirty or unpushed. Otherwise it runs `git pull --ff-only && docker-compose up -d --build --no-deps spelling-bee-backend` in `~/spelling-bee`.
@@ -123,6 +123,8 @@ Both modes share the same frontend pages, which branch on `game_mode`: the contr
 - `state.player`, `state.team` and `state.word` are dicts that `_fetch_player`/`_fetch_team`/`_fetch_word` cache at selection time. `state.team` includes `members` (each built by `_player_dict`). `state.game_mode` is re-read from the DB on connect and on `CLEAR_DISPLAY`. If you add a field the display needs, add it to these fetchers.
 - Fire-and-forget commands broadcast their own message type and skip the state update. `PLAY_SOUND` broadcasts `{type: "PLAY_SOUND", sound}`. `PRONOUNCE_WORD` broadcasts `{type: "PRONOUNCE_WORD", word, rate}`, and the display speaks it with the Web Speech API. The server takes the word text from the current state, not from the client.
 - The **controller owns the timer**. It counts down locally and sends `UPDATE_TIMER` every second. The display only renders it.
+- **Timer ticks must not redraw views.** Each tick broadcasts the full state, so `display.html` (`lastViewKey`) and `control.html` (`lastListKey`) compare the state minus `timer_*` and skip re-rendering when only the timer changed. `switchView` replays the entrance animation only when the screen actually changes. Without this the TV flashes every second. Keep any new per-tick field out of those keys.
+- **Timer length** is `Session.timer_duration_seconds`. It's edited in Setup or with the controller's −15s/+15s, which also sends `RESET_TIMER {duration}`, and that sets `GameState.timer_duration`. `_sync_session_settings` re-reads it, along with `game_mode`, on connect and on `CLEAR_DISPLAY`. The TV's bar colors are percentages of `timer_duration`, so it must match the session.
 - `display_mode` is one of `idle | player_intro | team_intro | spelling | result | scoreboard`, and drives which view `display.html` shows.
 - When the controller reveals a hint, the display also speaks it. `speakNewHints` diffs `revealed_info` for the same word.
 

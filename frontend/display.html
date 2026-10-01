@@ -121,6 +121,8 @@
         let lastDisplayMode = null;
         let lastResult = null;
         let lastTickSecond = -1;
+        let lastViewKey = null;   // skip redraws when only the timer changed
+        let currentView = null;
 
         const views = {
             idle: document.getElementById('view-idle'),
@@ -249,11 +251,21 @@
             }
 
             speakNewHints(oldState, s);
-            updateView(msg);
+            // The controller sends a timer tick every second; redrawing the view for those
+            // replays its fade/slide animations and makes the screen flash. Only redraw when
+            // something other than the timer changed.
+            const { timer_running, timer_seconds_remaining, timer_duration, ...viewState } = s;
+            const viewKey = JSON.stringify([viewState, msg.scoreboard, msg.team_scoreboard]);
+            if (viewKey !== lastViewKey) {
+                lastViewKey = viewKey;
+                updateView(msg);
+            }
             updateTimer();
         }
 
         function switchView(viewName) {
+            if (viewName === currentView) return; // same screen: content was updated in place, don't replay the entrance animation
+            currentView = viewName;
             Object.entries(views).forEach(([name, el]) => {
                 if (name === viewName) {
                     el.classList.remove('hidden');
@@ -462,9 +474,10 @@
 
                 dom.timerBar.style.width = `${pct}%`;
 
+                // Same thresholds as the controller's bar, relative to this session's timer length
                 let colorClass = 'bg-green-500 shadow-[0_0_15px_rgba(74,222,128,0.5)]';
-                if (remaining <= 30) colorClass = 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]';
-                else if (remaining <= 45) colorClass = 'bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.5)]';
+                if (pct <= 25) colorClass = 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]';
+                else if (pct <= 37.5) colorClass = 'bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.5)]';
 
                 dom.timerBar.className = `h-full transition-all duration-1000 ${colorClass}`;
 

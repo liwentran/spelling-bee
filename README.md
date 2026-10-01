@@ -40,9 +40,9 @@ You need three screens. They don't have to be on the same device, but they must 
 ### 1. Before the game (Setup page)
 
 1. Click **+ New Session**. Enter a name, set the timer (seconds per word), and tick **Elimination Mode** if a miss knocks you out. Choose **👤 Individual** or **👥 Team**, then click **Create**.
-2. Click the session in the list to open it.
+2. Click the session in the list to open it. Setup reopens the last session you used. You can change **⏱ Time per word** at the top at any time.
 3. **Team game only:** click **+ Add Team** for each team. Give it a name and pick a color.
-4. Click **+ Add Player** for each speller. In a team game, choose their team in the dropdown. Click **✏️** on a player to edit them later.
+4. Click **+ Add Player** for each speller. In a team game, choose their team in the dropdown. Every player is listed with their details; click **✏️ Edit** on one to change them.
 5. Add words:
    - **+ Add Word**, one at a time. The last dropdown in the form (it starts at "-- Session Pool --") gives the word to one player, a team's pool, or the shared pool.
    - **Bulk Import**, to paste a JSON list of words.
@@ -61,7 +61,7 @@ You need three screens. They don't have to be on the same device, but they must 
 | 1. Call someone up | Tap the **player's name** under *Select Player* | Tap the **team** under *Select Team*. Optionally tap a member under *Who's spelling?* (tap again to clear) | "Up Next": the player's bio, or the team with a card for every member |
 | 2. Pick a word | Tab **Player's** (their words + their team's pool), **Pool**, or **All** → tap a word | Tab **Team's** (team pool + all members' words), **Pool**, or **All** → tap a word | The spelling screen with the word, the player/team name, and the round |
 | 3. Say the word | Tap **🔊 Pronounce Word** (repeat as often as asked) | same | The TV speaks the word aloud |
-| 4. Start the clock | Tap **▶**. **⏸** pauses, **↺** resets | same | The timer bar runs along the bottom: green → yellow → red, ticking in the last 10 seconds |
+| 4. Start the clock | Tap **▶**. **⏸** pauses, **↺** resets. Change the length with **−15s / +15s** under *Time per word* (only while the clock is stopped; the change is saved for the session) | same | The timer bar runs along the bottom: green → yellow → red, ticking in the last 10 seconds |
 | 5. Answer questions | When the speller asks, tap **📖 Definition**, **📝 Sentence**, **🌍 Origin**, **🔤 Part of Speech** or **🔊 Alt. Pronunciations**. Tap again to hide it | same | The hint appears on screen and is read aloud |
 | 6. Judge | Tap **✅ CORRECT** or **❌ INCORRECT**. If the clock hits zero, **⏰ TIMEOUT** happens automatically | same | Green confetti, or red/orange with the correct spelling |
 
@@ -93,7 +93,17 @@ Then go back to step 1 for the next speller.
 
 ## Deployment
 
-Deployed at **http://143.244.162.12:8003/** on the shared droplet. Commit and push to `main`, then run `make deploy`.
+Deployed at **http://143.244.162.12:8003/** on a DigitalOcean droplet shared with other apps. It runs in the `spelling-bee-backend` container, built from `~/spelling-bee` on the droplet.
+
+```bash
+git push origin main   # make deploy refuses if the tree is dirty or unpushed
+make deploy            # git pull on the droplet + rebuild only this container
+make logs              # tail the deployed container's logs
+```
+
+- **Local edits don't go live by themselves.** Only `make deploy` updates the droplet. If a feature works locally but not at the URL above, it hasn't been deployed.
+- **Local and production share one database** (`spellingbee` in `general-db`). `make up` runs migrations on startup, so a new migration hits production as soon as you run it locally, even before the code that uses it is deployed. Keep migrations backward compatible, and deploy soon after.
+- **Backups:** a nightly cron at 3:00 AM on the droplet (`/root/cafe/backup_db.sh`) dumps every database to [`gs://liwentran.com/db_backups/`](https://console.cloud.google.com/storage/browser/liwentran.com/db_backups) and keeps 7 days locally. The spelling bee files are `spellingbee_db_<timestamp>.dump`. To restore one: `pg_restore -U postgres -d spellingbee --clean <file>`.
 
 ## AI Import / Export
 
@@ -146,10 +156,11 @@ Use `player_name` to give a word to one player, `team_name` to put it in a team'
 
 ## Example Data
 
-`make seed` creates two demo sessions. It's safe to re-run: it goes through the same import as above, so existing example sessions are updated in place.
+`make seed` sets up three demo sessions. It's safe to re-run: it goes through the same import as above, so existing sessions are updated in place and anything added by hand is kept.
 
-- **Example: Team Bee**: a team game, Honeybees vs Bumblebees, 4 players with bios, player words, team-pool words, and a shared tiebreaker pool
-- **Example: Classroom Elimination Bee** — 3 solo players, elimination mode, 60s timer, 4th-grade word pool
+- **National Spelling Bee Demo**: an individual elimination bee with a 2-minute timer and finalists working through real past Scripps National Spelling Bee winning words (*stichomythia*, *feuilleton*, *nunatak*, …), plus a 12-word championship pool for tiebreakers.
+- **Example: Team Bee**: a team game, Honeybees vs Bumblebees, with 3 players per team. The TV team intro shows all three member cards. Each player has their own words, each team has a pool of bee-themed words, and there's a shared tiebreaker pool.
+- **Example: Classroom Elimination Bee**: 3 fourth-graders, elimination mode, 60s timer. Each has 3 words tied to their fun fact, plus an 8-word class pool.
 
 ## Tech Stack
 
@@ -162,7 +173,7 @@ Use `player_name` to give a word to one player, `team_name` to put it in a team'
 
 | Command | Description |
 |---------|-------------|
-| `make up` | Open the DB tunnel and run the app locally with reload on :8003 |
+| `make up` (or `make dev`) | Open the DB tunnel and run the app locally with reload on :8003 |
 | `make down` | Stop the local app |
 | `make tunnel` | Open the SSH tunnel to the droplet DB on :5433 |
 | `make migrate` | Run database migrations |

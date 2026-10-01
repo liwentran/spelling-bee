@@ -62,6 +62,10 @@
                         <span id="mode-badge" class="text-xs font-semibold px-2 py-0.5 rounded-full"></span>
                         <button id="btn-switch-mode" class="text-xs text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"></button>
                     </div>
+                    <label class="text-xs text-gray-500 flex items-center gap-1 mt-1">⏱ Time per word
+                        <input id="session-timer-edit" type="number" min="15" max="600" step="15" class="w-16 p-0.5 border rounded text-gray-800 text-xs"> seconds
+                        <span id="timer-saved" class="text-green-600 hidden">✓ saved</span>
+                    </label>
                 </div>
                 <div class="flex items-center space-x-2">
                     <button id="btn-copy-display" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition shadow-sm">
@@ -118,7 +122,7 @@
             <!-- Players -->
             <div class="bg-white p-6 rounded-lg shadow">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold">Players</h2>
+                    <h2 class="text-xl font-bold">Players <span id="player-count" class="text-sm font-normal text-gray-400"></span></h2>
                     <button id="btn-add-player" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">+ Add Player</button>
                 </div>
 
@@ -143,7 +147,7 @@
             <!-- Words -->
             <div class="bg-white p-6 rounded-lg shadow">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold">Words</h2>
+                    <h2 class="text-xl font-bold">Words <span id="word-count" class="text-sm font-normal text-gray-400"></span></h2>
                     <div class="space-x-2">
                         <button id="btn-add-word" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">+ Add Word</button>
                         <button id="btn-import-words" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">Bulk Import</button>
@@ -169,6 +173,7 @@
                     <input type="text" id="word-origin" placeholder="Origin" class="p-2 border rounded">
                     <input type="text" id="word-alt" placeholder="Alt. Pronunciations" class="col-span-2 p-2 border rounded">
                     <select id="word-difficulty" class="p-2 border rounded">
+                        <option value="">Difficulty —</option>
                         <option value="1">Difficulty 1</option>
                         <option value="2">Difficulty 2</option>
                         <option value="3">Difficulty 3</option>
@@ -179,7 +184,7 @@
                         <option value="">-- Session Pool --</option>
                     </select>
                     <div class="col-span-2 flex space-x-2 mt-2">
-                        <button id="btn-save-word" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Save</button>
+                        <button id="btn-save-word" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Add Word</button>
                         <button id="btn-cancel-word" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
                     </div>
                 </div>
@@ -244,13 +249,30 @@
             dom.playerTeamSelect.value = player?.team_id || '';
             document.getElementById('btn-save-player').textContent = player ? `Save ${player.name}` : 'Add Player';
             toggleForm('new-player-form', true);
-            document.getElementById('player-name').focus();
+            document.getElementById('new-player-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            document.getElementById('player-name').focus({ preventScroll: true });
         }
         document.getElementById('btn-add-player').onclick = () => openPlayerForm();
         document.getElementById('btn-cancel-player').onclick = () => { editingPlayerId = null; toggleForm('new-player-form', false); };
         window.editPlayer = (id) => openPlayerForm(players.find(p => p.id === id));
-        document.getElementById('btn-add-word').onclick = () => toggleForm('new-word-form', true);
-        document.getElementById('btn-cancel-word').onclick = () => toggleForm('new-word-form', false);
+        // Word form doubles as the edit form; editingWordId set = edit mode
+        let editingWordId = null;
+        const WORD_INPUTS = { word: 'word-text', definition: 'word-def', sentence: 'word-sentence', part_of_speech: 'word-pos',
+                              language_of_origin: 'word-origin', alternate_pronunciations: 'word-alt' };
+        function openWordForm(word = null) {
+            editingWordId = word?.id || null;
+            Object.entries(WORD_INPUTS).forEach(([key, id]) => document.getElementById(id).value = word?.[key] ?? '');
+            document.getElementById('word-difficulty').value = word ? (word.difficulty ?? '') : '1';
+            updatePlayerDropdown();
+            dom.wordPlayerSelect.value = word ? assignmentValue(word) : (activeTab === 'all' ? '' : activeTab === 'pool' ? '' : activeTab.startsWith('team:') ? activeTab : `player:${activeTab}`);
+            document.getElementById('btn-save-word').textContent = word ? `Save "${word.word}"` : 'Add Word';
+            toggleForm('new-word-form', true);
+            document.getElementById('new-word-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            document.getElementById('word-text').focus({ preventScroll: true });
+        }
+        document.getElementById('btn-add-word').onclick = () => openWordForm();
+        document.getElementById('btn-cancel-word').onclick = () => { editingWordId = null; toggleForm('new-word-form', false); };
+        window.editWord = (id) => openWordForm(words.find(w => w.id === id));
         document.getElementById('btn-import-words').onclick = () => toggleForm('import-words-form', true);
         document.getElementById('btn-cancel-import').onclick = () => toggleForm('import-words-form', false);
 
@@ -321,8 +343,19 @@
             btn.disabled = currentSession.turns_count > 0;
             btn.title = btn.disabled ? 'Turns have been played; reset the session to change the game type' : '';
             dom.teamsCard.classList.toggle('hidden', !isTeam);
+            document.getElementById('session-timer-edit').value = currentSession.timer_duration_seconds;
             dom.playerTeamSelect.classList.toggle('hidden', !isTeam);
         }
+
+        document.getElementById('session-timer-edit').onchange = async (e) => {
+            const secs = Math.min(600, Math.max(15, parseInt(e.target.value) || 120));
+            e.target.value = secs;
+            await api.updateSession(currentSession.id, { timer_duration_seconds: secs });
+            currentSession.timer_duration_seconds = secs;
+            const saved = document.getElementById('timer-saved');
+            saved.classList.remove('hidden');
+            setTimeout(() => saved.classList.add('hidden'), 1500);
+        };
 
         document.getElementById('btn-switch-mode').onclick = async () => {
             const next = teamMode() ? 'individual' : 'team';
@@ -334,6 +367,7 @@
 
         window.selectSession = async (id) => {
             currentSession = await api.getSession(id);
+            try { localStorage.setItem('setup.lastSessionId', id); } catch (e) {}
             dom.sessionDetails.classList.remove('hidden');
             document.getElementById('active-session-title').textContent = currentSession.name;
             renderModeBar();
@@ -445,7 +479,10 @@
         };
 
         function renderPlayers() {
-            dom.playerList.innerHTML = players.map(p => {
+            document.getElementById('player-count').textContent = `(${players.length})`;
+            dom.playerList.innerHTML = players.length === 0
+                ? '<div class="text-sm text-gray-400">No players yet. Click <b>+ Add Player</b>, or use <b>Import JSON</b> above.</div>'
+                : players.map(p => {
                 const team = teamMode() ? teams.find(t => t.id === p.team_id) : null;
                 const needsTeam = teamMode() && !team;
                 return `
@@ -454,9 +491,10 @@
                         <div class="font-bold">${p.name} ${p.eliminated ? '<span class="text-red-500 text-xs">(Eliminated)</span>' : ''}
                             ${needsTeam ? '<span class="text-amber-600 text-xs font-semibold ml-1">⚠ No team — won\'t appear in the game</span>' : ''}</div>
                         <div class="text-xs text-gray-500">${[p.age ? `Age ${p.age}` : '', p.grade, p.school].filter(Boolean).join(' · ')}</div>
-                        ${p.fun_fact ? `<div class="text-xs text-gray-400 italic truncate max-w-md">"${p.fun_fact}"</div>` : ''}
+                        ${p.fun_fact ? `<div class="text-xs text-gray-500 italic">"${p.fun_fact}"</div>` : '<div class="text-xs text-gray-300 italic">No fun fact yet</div>'}
+                        <div class="text-xs text-gray-400 mt-0.5">${words.filter(w => w.player_id === p.id).length} own word(s)</div>
                     </div>
-                    <button onclick="window.editPlayer('${p.id}')" class="text-gray-500 hover:text-gray-800" title="Edit player">✏️</button>
+                    <button onclick="window.editPlayer('${p.id}')" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded" title="Edit player">✏️ Edit</button>
                     ${teamMode() && teams.length ? `
                     <select onchange="window.setPlayerTeam('${p.id}', this.value)" class="text-sm p-1 border rounded">
                         <option value="">No Team</option>${teamOptions(p.team_id)}
@@ -545,7 +583,10 @@
                 return w.player_id === activeTab;
             });
 
-            dom.wordList.innerHTML = filtered.map(w => {
+            document.getElementById('word-count').textContent = `(${words.length})`;
+            dom.wordList.innerHTML = filtered.length === 0
+                ? '<div class="text-sm text-gray-400">No words here yet.</div>'
+                : filtered.map(w => {
                 return `
                 <div class="p-3 border rounded bg-white shadow-sm flex justify-between items-center ${w.used ? 'opacity-50' : ''}">
                     <div>
@@ -554,9 +595,12 @@
                             <span class="text-yellow-500 text-xs">${'★'.repeat(w.difficulty || 0)}</span>
                             ${w.used ? '<span class="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded">Used</span>' : ''}
                         </div>
-                        <div class="text-xs text-gray-500 truncate max-w-md">${w.definition || 'No definition'}</div>
+                        <div class="text-xs text-gray-500">${w.definition || '<span class="text-gray-300 italic">No definition</span>'}</div>
+                        ${w.sentence ? `<div class="text-xs text-gray-400 italic">"${w.sentence}"</div>` : ''}
+                        <div class="text-xs text-gray-400">${[w.part_of_speech, w.language_of_origin, w.alternate_pronunciations ? `/${w.alternate_pronunciations}/` : ''].filter(Boolean).join(' · ')}</div>
                     </div>
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-3 flex-shrink-0">
+                        <button onclick="window.editWord('${w.id}')" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded" title="Edit word">✏️ Edit</button>
                         <select onchange="window.setWordAssignment('${w.id}', this.value)" class="text-sm p-1 border rounded max-w-[160px]">${assignmentOptions(assignmentValue(w))}</select>
                         <button onclick="window.deleteWord('${w.id}')" class="text-red-500 hover:text-red-700">Del</button>
                     </div>
@@ -574,16 +618,20 @@
         document.getElementById('btn-save-word').onclick = async () => {
             const word = document.getElementById('word-text').value;
             if(!word) return alert('Word required');
-            await api.createWord(currentSession.id, {
+            const difficulty = document.getElementById('word-difficulty').value;
+            const data = {
                 word,
                 definition: document.getElementById('word-def').value,
                 sentence: document.getElementById('word-sentence').value,
                 part_of_speech: document.getElementById('word-pos').value,
                 language_of_origin: document.getElementById('word-origin').value,
                 alternate_pronunciations: document.getElementById('word-alt').value,
-                difficulty: parseInt(document.getElementById('word-difficulty').value),
+                difficulty: difficulty ? parseInt(difficulty) : null,
                 ...parseAssignment(dom.wordPlayerSelect.value)
-            });
+            };
+            if (editingWordId) await api.updateWord(currentSession.id, editingWordId, data);
+            else await api.createWord(currentSession.id, data);
+            editingWordId = null;
             toggleForm('new-word-form', false);
             loadSessionData();
         };
@@ -639,8 +687,15 @@ Rules:
             }
         };
 
-        // Init
-        loadSessions();
+        // Init: reopen the last session (or the first one) so players and words are visible right away
+        (async () => {
+            const sessions = await api.fetchSessions().catch(() => []);
+            let last = null;
+            try { last = localStorage.getItem('setup.lastSessionId'); } catch (e) {}
+            const initial = sessions.find(s => s.id === last) || sessions[0];
+            if (initial) await window.selectSession(initial.id);
+            else loadSessions();
+        })();
     </script>
 </body>
 </html>

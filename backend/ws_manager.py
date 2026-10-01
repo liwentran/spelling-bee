@@ -92,12 +92,18 @@ def _fetch_team(team_id: str) -> Optional[dict]:
     return None
 
 
-def _fetch_game_mode(session_id: str) -> str:
+def _sync_session_settings(state: "GameState", session_id: str):
+    """Pull game mode and timer length from the DB (they're edited in Setup / the controller).
+    A running or paused-mid-word timer is left alone; an idle one is reset to the new length."""
     from models import Session as SessionModel
-    engine = get_engine()
-    with SQLSession(engine) as session:
+    with SQLSession(get_engine()) as session:
         sess = session.get(SessionModel, session_id)
-        return sess.game_mode if sess else "individual"
+        if not sess:
+            return
+        state.game_mode = sess.game_mode
+        if not state.timer_running and state.timer_seconds_remaining in (0, state.timer_duration):
+            state.timer_seconds_remaining = sess.timer_duration_seconds
+        state.timer_duration = sess.timer_duration_seconds
 
 
 def _fetch_word(word_id: str) -> Optional[dict]:
@@ -146,9 +152,9 @@ class ConnectionManager:
         if session_id not in self.active_connections:
             self.active_connections[session_id] = set()
         self.active_connections[session_id].add(ws)
-        # Send initial state; re-read game mode in case it changed in Setup
+        # Send initial state; re-read game mode / timer length in case they changed in Setup
         state = self.get_state(session_id)
-        state.game_mode = _fetch_game_mode(session_id)
+        _sync_session_settings(state, session_id)
         await ws.send_json({"type": "STATE_UPDATE", "state": state.to_dict()})
 
     def disconnect(self, session_id: str, ws: WebSocket):
@@ -202,7 +208,9 @@ class ConnectionManager:
 
         elif cmd_type == "RESET_TIMER":
             state.timer_running = False
-            state.timer_seconds_remaining = command.get("duration", state.timer_duration)
+            # Keep timer_duration in step so the TV's bar percentage and colors are right
+            state.timer_duration = command.get("duration", state.timer_duration)
+            state.timer_seconds_remaining = state.timer_duration
 
         elif cmd_type == "UPDATE_TIMER":
             # Controller sends timer ticks
@@ -239,7 +247,7 @@ class ConnectionManager:
 
         elif cmd_type == "CLEAR_DISPLAY":
             state.display_mode = "idle"
-            state.game_mode = _fetch_game_mode(session_id)
+            _sync_session_settings(state, session_id)
             state.current_team_id = None
             state.team_details = None
             state.current_player_id = None
