@@ -50,7 +50,8 @@ export async function deleteTeam(sessionId, teamId) { return request(`/sessions/
 // Roster (whole-session import/export, used for AI round-trips)
 export async function createSessionFromJson(data) { return request('/sessions/import', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(data) }); }
 export async function exportSession(sessionId) { return request(`/sessions/${sessionId}/export`); }
-export async function importSession(sessionId, data) { return request(`/sessions/${sessionId}/import`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify(data) }); }
+// Replaces the session's teams/players/words with the JSON's; dryRun reports the changes (incl. removals) without saving
+export async function importSession(sessionId, data, { dryRun = false } = {}) { return request(`/sessions/${sessionId}/import${dryRun ? '?dry_run=true' : ''}`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify(data) }); }
 export async function recordTurn(sessionId, data) { return request(`/sessions/${sessionId}/turns/`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify(data) }); }
 
 // Turns

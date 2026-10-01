@@ -100,7 +100,7 @@
                 <div class="flex flex-wrap justify-between items-center gap-2">
                     <div>
                         <h2 class="text-xl font-bold">🤖 AI Import / Export</h2>
-                        <p class="text-sm text-gray-500">Copy this session for ChatGPT/Claude, ask for changes, paste the JSON back. Matches by name; never deletes.</p>
+                        <p class="text-sm text-gray-500">Copy this session for ChatGPT/Claude, ask for changes, paste the JSON back. The session then matches the JSON exactly; you will be asked before anything is removed.</p>
                     </div>
                     <div class="space-x-2">
                         <button id="btn-copy-ai" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">Copy for AI</button>
@@ -667,11 +667,11 @@
         const JSON_RULES = `Rules:
 - Session settings: "name"; "game_mode" is "individual" or "team"; "timer_duration_seconds" is the time per word (15-600); "elimination_mode" is true if a miss knocks the speller (or team) out.
 - In a team game, list each player inside their team's "players" (teams have "name" and a hex "color"). In an individual game, put players in the top-level "players".
-- Teams and players are matched by name: keep a name exactly the same to update that entry; a new name adds a new one.
-- Fields you leave out stay unchanged. Nothing is ever deleted, so just leave out anything you don't want to touch.
+- Teams and players are matched by name and words by their text: keep a name exactly the same to update that entry; a new name adds a new one.
 - Words: "player_name" gives a word to one player, "team_name" puts it in a team's pool, neither puts it in the shared pool. "difficulty" is 1-5.
 - Player fields: name, age, grade, school, fun_fact. Word fields: word, definition, sentence, part_of_speech, language_of_origin, alternate_pronunciations, difficulty.`;
-        const AI_INSTRUCTIONS = `Below is my spelling bee setup as JSON. Change it however I ask after the JSON, then reply with ONLY the complete JSON in the same format.\n${JSON_RULES}`;
+        const AI_INSTRUCTIONS = `Below is my spelling bee setup as JSON. Change it however I ask after the JSON, then reply with ONLY the complete JSON in the same format.
+IMPORTANT: your JSON replaces the whole setup. Include EVERY team, player and word that should remain, not just the changes. Anything you leave out of "teams", "players" or "words" will be deleted.\n${JSON_RULES}`;
         const TEMPLATE_INSTRUCTIONS = `Write a complete spelling bee session as JSON in exactly this format, then reply with ONLY the JSON. Fill in real words with accurate definitions, example sentences, part of speech, language of origin and difficulty (1-5).\n${JSON_RULES}`;
         const BLANK_TEMPLATE = {
             name: "My Spelling Bee", game_mode: "team", timer_duration_seconds: 90, elimination_mode: true,
@@ -705,9 +705,21 @@
             try { data = parseLooseJson(raw); }
             catch (e) { return alert('Could not find valid JSON: ' + e.message); }
             try {
+                // Preview first; replacing can delete entries the JSON left out
+                const preview = await api.importSession(currentSession.id, data, { dryRun: true });
+                const r = preview.removed_names;
+                const removedCount = r.teams.length + r.players.length + r.words.length;
+                if (removedCount || preview.turns_removed) {
+                    const list = (label, names) => names.length ? `\n${label} (${names.length}): ${names.slice(0, 15).join(', ')}${names.length > 15 ? ', …' : ''}` : '';
+                    const msg = `This JSON leaves out entries that are in the session now. Importing will REMOVE:` +
+                        list('Teams', r.teams) + list('Players', r.players) + list('Words', r.words) +
+                        (preview.turns_removed ? `\n\n⚠ ${preview.turns_removed} recorded turn(s) for these will be deleted too.` : '') +
+                        `\n\nIt will also add ${fmtCounts(preview.created)} and update ${fmtCounts(preview.updated)}. Continue?`;
+                    if (!confirm(msg)) return;
+                }
                 const res = await api.importSession(currentSession.id, data);
                 resultEl.className = `mt-3 text-sm p-3 rounded border ${res.warnings.length ? 'bg-amber-50 border-amber-300' : 'bg-green-50 border-green-300'}`;
-                resultEl.innerHTML = `<b>Imported.</b> Created ${fmtCounts(res.created)}. Updated ${fmtCounts(res.updated)}.${res.session_updated ? ' Session settings updated.' : ''}` +
+                resultEl.innerHTML = `<b>Imported.</b> Created ${fmtCounts(res.created)}. Updated ${fmtCounts(res.updated)}. Removed ${fmtCounts(res.removed)}.${res.session_updated ? ' Session settings updated.' : ''}` +
                     (res.warnings.length ? `<ul class="list-disc ml-5 mt-1">${res.warnings.map(w => `<li>${w}</li>`).join('')}</ul>` : '');
                 document.getElementById('roster-json').value = '';
                 toggleForm('roster-import-form', false);

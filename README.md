@@ -118,7 +118,7 @@ A whole session can be one JSON document: its name, game type, time per word, el
 | Where | What it does |
 |---|---|
 | Setup → **+ New Session** → **From JSON** | Create a brand-new session from JSON (`POST /api/sessions/import`). **Copy blank template for AI** gives ChatGPT/Claude the format and rules to write one for you. |
-| Setup → **Copy for AI** / **Import JSON** | Export the open session, have an AI edit it, and paste it back (`GET`/`POST /api/sessions/{id}/export\|import`) |
+| Setup → **Copy for AI** / **Import JSON** | Copy the open session's complete JSON as a starting point, have an AI edit it, and paste it back. The session is **replaced** to match (`GET`/`POST /api/sessions/{id}/export\|import`). |
 | [`examples/*.json`](examples/) | The demo sessions, loaded by `make seed`. Copy one as a starting point. |
 
 ```json
@@ -151,10 +151,13 @@ A whole session can be one JSON document: its name, game type, time per word, el
 | `players` | Players with no team, in an individual game. A `"team_name"` on one of them assigns them to a team. |
 | `words[]` | `player_name` gives a word to one player, `team_name` puts it in a team's pool, neither puts it in the shared pool. `difficulty` is 1–5. |
 
-Import rules:
-- Teams and players are **matched by name**, case-insensitively. A matching name updates that entry; a new name creates one.
-- Only the fields you include change, and `null` settings are ignored. **Nothing is ever deleted.**
+Import rules (into an existing session):
+- **The JSON replaces the session.** The `teams`, `players` and `words` lists are the complete set: anything in the session that's missing from them is **removed**. That's what makes copy → edit → import work, including deletions.
+- **You're asked first.** Before removing anything, Setup lists exactly what will go, plus any recorded turns that go with it. Cancel and nothing changes.
+- **Matching keeps history.** Teams and players are matched by name (case-insensitively), and words by their text. A matched entry is updated in place, so it keeps its scores, turns and "used" status, even if a word moves to a different player.
+- **Omitted sections are left alone.** A JSON with no `"words"` key leaves words untouched, so `{"timer_duration_seconds": 60}` only changes the timer. `null` settings are ignored.
 - Words with an unknown `player_name`/`team_name` are skipped, with a warning.
+- API: `?dry_run=true` previews the changes without saving, and `?mode=merge` only adds and updates, never removing. `make seed` uses merge, so it never deletes anything added by hand.
 
 ## Bulk Word Import Format
 
