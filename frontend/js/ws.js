@@ -76,6 +76,7 @@ export function isConnected() {
 }
 
 // Helper functions — match backend ws_manager.py command types exactly
+export const setActiveTeam = (id) => send({ type: 'SET_ACTIVE_TEAM', team_id: id });
 export const setActivePlayer = (id) => send({ type: 'SET_ACTIVE_PLAYER', player_id: id });
 export const setActiveWord = (id) => send({ type: 'SET_ACTIVE_WORD', word_id: id });
 export const startTimer = () => send({ type: 'START_TIMER' });
@@ -91,6 +92,7 @@ export const hideInfo = (type) => send({ type: 'HIDE_INFO', info_type: type });
 export const clearDisplay = () => send({ type: 'CLEAR_DISPLAY' });
 export const showScoreboard = () => send({ type: 'SHOW_SCOREBOARD' });
 export const showPlayerIntro = () => send({ type: 'SHOW_PLAYER_INTRO' });
+export const showTeamIntro = () => send({ type: 'SHOW_TEAM_INTRO' });
 export const nextRound = () => send({ type: 'NEXT_ROUND' });
 export const playSound = (sound) => send({ type: 'PLAY_SOUND', sound });
 export const pronounceWord = (rate) => send({ type: 'PRONOUNCE_WORD', rate });

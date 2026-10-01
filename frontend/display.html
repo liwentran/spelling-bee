@@ -58,12 +58,20 @@
             <div id="intro-fact" class="text-4xl italic text-yellow-300 opacity-90 max-w-4xl mx-auto"></div>
         </div>
 
+        <!-- Team Intro View (team mode): the team plus every member -->
+        <div id="view-team-intro" class="hidden w-full text-center slide-up">
+            <div class="text-yellow-500 text-3xl mb-4 tracking-widest uppercase">Up Next</div>
+            <h1 id="team-intro-name" class="text-8xl font-serif glow font-black mb-10"></h1>
+            <div id="team-intro-members" class="grid gap-6 w-full"></div>
+        </div>
+
         <!-- Spelling Mode -->
         <div id="view-spelling" class="hidden w-full h-full flex flex-col justify-between py-12 fade-in">
             <div class="flex justify-between items-center text-3xl font-bold opacity-70">
                 <div id="spell-player" class="uppercase tracking-widest text-yellow-500"></div>
                 <div id="spell-round" class="uppercase tracking-widest"></div>
             </div>
+            <div id="spell-members" class="hidden flex flex-wrap gap-3 mt-4"></div>
 
             <div class="flex-grow flex flex-col justify-center items-center text-center">
                 <h1 id="spell-word" class="word-text font-serif glow font-black mb-8"></h1>
@@ -85,6 +93,7 @@
         <div id="view-scoreboard" class="hidden w-full fade-in flex flex-col items-center pt-12">
             <h1 class="text-6xl font-serif glow font-black mb-12">Scoreboard</h1>
             <div id="team-scoreboard" class="hidden w-full max-w-5xl grid gap-4 mb-8"></div>
+            <h2 id="players-heading" class="hidden w-full max-w-5xl text-2xl font-bold text-gray-400 uppercase tracking-widest mb-4">Players</h2>
             <div class="w-full max-w-5xl bg-gray-900/50 rounded-2xl p-8 border border-gray-700">
                 <div class="grid grid-cols-4 gap-4 text-2xl font-bold text-gray-400 mb-6 border-b border-gray-700 pb-4">
                     <div class="col-span-2">Player</div>
@@ -116,6 +125,7 @@
         const views = {
             idle: document.getElementById('view-idle'),
             player_intro: document.getElementById('view-player-intro'),
+            team_intro: document.getElementById('view-team-intro'),
             spelling: document.getElementById('view-spelling'),
             result: document.getElementById('view-result'),
             scoreboard: document.getElementById('view-scoreboard')
@@ -205,6 +215,9 @@
             speak(text);
         }
 
+        // Escape user/AI-entered text before putting it into innerHTML
+        const esc = (str) => String(str ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
         // Team colors are user-entered; only allow hex values into style attributes
         const teamColor = (c) => /^#[0-9a-f]{3,8}$/i.test(c || '') ? c : '#eab308';
 
@@ -258,6 +271,7 @@
             const s = state;
             const player = s.player;  // Included in state broadcast by backend
             const word = s.word;      // Included in state broadcast by backend
+            const team = s.team;      // Team mode: team at the mic, with members
 
             switch (s.display_mode) {
                 case 'idle':
@@ -283,9 +297,43 @@
                     switchView('player_intro');
                     break;
 
+                case 'team_intro':
+                    if (team) {
+                        const nameEl = document.getElementById('team-intro-name');
+                        nameEl.textContent = team.name;
+                        nameEl.style.color = teamColor(team.color);
+                        const members = team.members || [];
+                        const grid = document.getElementById('team-intro-members');
+                        grid.style.gridTemplateColumns = `repeat(${Math.min(Math.max(members.length, 1), 4)}, minmax(0, 1fr))`;
+                        grid.innerHTML = members.map(m => {
+                            const isSpeller = s.current_player_id === m.id;
+                            const meta = [m.age ? `Age ${m.age}` : '', m.grade, m.school].filter(Boolean).map(esc).join(' · ');
+                            return `
+                            <div class="bg-gray-900/60 rounded-2xl p-6 border-2 slide-up" style="border-color: ${isSpeller ? teamColor(team.color) : 'rgba(75,85,99,0.6)'}">
+                                ${isSpeller ? `<div class="text-sm font-bold uppercase tracking-widest mb-2" style="color: ${teamColor(team.color)}">Spelling</div>` : ''}
+                                <div class="text-4xl font-serif font-black text-white mb-2">${esc(m.name)}</div>
+                                <div class="text-xl opacity-80 mb-3">${meta}</div>
+                                ${m.fun_fact ? `<div class="text-xl italic text-yellow-300 opacity-90">"${esc(m.fun_fact)}"</div>` : ''}
+                            </div>`;
+                        }).join('');
+                    }
+                    switchView('team_intro');
+                    break;
+
                 case 'spelling':
-                    if (player) {
-                        const spellPlayer = document.getElementById('spell-player');
+                    const spellPlayer = document.getElementById('spell-player');
+                    const spellMembers = document.getElementById('spell-members');
+                    spellMembers.classList.toggle('hidden', !(s.game_mode === 'team' && team));
+                    if (s.game_mode === 'team' && team) {
+                        // Team mode: team name in its color, member chips with the speller highlighted
+                        spellPlayer.textContent = team.name;
+                        spellPlayer.style.color = teamColor(team.color);
+                        spellMembers.innerHTML = (team.members || []).map(m => {
+                            const on = s.current_player_id === m.id;
+                            return `<span class="px-4 py-1 rounded-full text-xl border-2 ${on ? 'font-bold text-black' : 'opacity-70'}" style="border-color: ${teamColor(team.color)};${on ? ` background-color: ${teamColor(team.color)};` : ''}">${esc(m.name)}</span>`;
+                        }).join('');
+                    } else if (player) {
+                        spellPlayer.style.color = '';
                         spellPlayer.textContent = player.team ? `${player.name} · ${player.team.name}` : player.name;
                     }
                     document.getElementById('spell-round').textContent = `Round ${s.round_number}`;
@@ -356,14 +404,28 @@
                     const scoreboard = msg.scoreboard || [];
                     const teamScoreboard = msg.team_scoreboard || [];
                     const teamSb = document.getElementById('team-scoreboard');
+                    const isTeamGame = s.game_mode === 'team';
                     teamSb.classList.toggle('hidden', teamScoreboard.length === 0);
-                    teamSb.style.gridTemplateColumns = `repeat(${Math.min(teamScoreboard.length, 4) || 1}, minmax(0, 1fr))`;
-                    teamSb.innerHTML = teamScoreboard.map(t => `
-                        <div class="bg-gray-900/60 rounded-2xl p-6 border-2 text-center" style="border-color: ${teamColor(t.team_color)}">
-                            <div class="text-2xl font-bold uppercase tracking-wider" style="color: ${teamColor(t.team_color)}">${t.team_name}</div>
-                            <div class="text-5xl font-mono font-black my-2">${t.total_correct}<span class="text-2xl opacity-50"> / ${t.total_attempts}</span></div>
-                            <div class="text-lg opacity-60">${t.active_count} of ${t.players_count} active</div>
+                    document.getElementById('players-heading').classList.toggle('hidden', !isTeamGame);
+                    if (isTeamGame) {
+                        // Team game: ranked team rows are the main scoreboard
+                        teamSb.style.gridTemplateColumns = '1fr';
+                        teamSb.innerHTML = teamScoreboard.map((t, i) => `
+                        <div class="flex items-center gap-6 bg-gray-900/60 rounded-2xl px-8 py-5 border-l-8 ${t.eliminated ? 'opacity-40' : ''}" style="border-color: ${teamColor(t.team_color)}">
+                            <div class="text-4xl font-black opacity-50 w-12">${i + 1}</div>
+                            <div class="flex-1 text-4xl font-bold ${t.eliminated ? 'line-through' : ''}" style="color: ${teamColor(t.team_color)}">${esc(t.team_name)}</div>
+                            <div class="text-4xl font-mono font-black">${t.total_correct}<span class="text-2xl opacity-50"> / ${t.total_attempts}</span></div>
+                            <div class="text-xl uppercase tracking-wider w-48 text-right">${t.eliminated ? `Eliminated R${t.rounds_survived + 1}` : 'Active'}</div>
                         </div>`).join('');
+                    } else {
+                        teamSb.style.gridTemplateColumns = `repeat(${Math.min(teamScoreboard.length, 4) || 1}, minmax(0, 1fr))`;
+                        teamSb.innerHTML = teamScoreboard.map(t => `
+                            <div class="bg-gray-900/60 rounded-2xl p-6 border-2 text-center" style="border-color: ${teamColor(t.team_color)}">
+                                <div class="text-2xl font-bold uppercase tracking-wider" style="color: ${teamColor(t.team_color)}">${t.team_name}</div>
+                                <div class="text-5xl font-mono font-black my-2">${t.total_correct}<span class="text-2xl opacity-50"> / ${t.total_attempts}</span></div>
+                                <div class="text-lg opacity-60">${t.active_count} of ${t.players_count} active</div>
+                            </div>`).join('');
+                    }
 
                     const sbList = document.getElementById('scoreboard-list');
                     sbList.innerHTML = scoreboard.map(p => {
@@ -378,7 +440,7 @@
                                 ${p.team_name ? `<span class="text-lg font-normal opacity-60">${p.team_name}</span>` : ''}
                             </div>
                             <div class="text-center font-mono">${p.total_correct} / ${total}</div>
-                            <div class="text-right text-xl uppercase tracking-wider">${isElim ? `Eliminated R${p.rounds_survived}` : 'Active'}</div>
+                            <div class="text-right text-xl uppercase tracking-wider">${isElim ? `Eliminated R${p.rounds_survived + 1}` : 'Active'}</div>
                         </div>`;
                     }).join('');
                     switchView('scoreboard');

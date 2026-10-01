@@ -1,14 +1,17 @@
 """Seed example sessions for demos and manual testing.
 
-Usage: cd backend && uv run python seed_examples.py
-Idempotent: a session whose name already exists is skipped.
+Usage: cd backend && uv run python seed_examples.py  (or `make seed`)
+Goes through the same upsert as POST /api/sessions/{id}/import, so re-running
+updates existing example sessions in place instead of duplicating them.
 """
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
+from fastapi import HTTPException
 from sqlmodel import Session as DbSession, select
 from database import get_engine
-from models import Session, Team, Player, Word
+from models import Session
+from routes.roster import RosterImport, import_roster
 
 # Word tuples: (word, definition, sentence, part_of_speech, language_of_origin, alternate_pronunciations, difficulty)
 
@@ -16,6 +19,7 @@ TEAM_BEE = {
     "name": "Example: Team Bee (Honeybees vs Bumblebees)",
     "timer_duration_seconds": 90,
     "elimination_mode": False,
+    "game_mode": "team",
     "teams": [
         {
             "name": "Honeybees",
@@ -56,6 +60,7 @@ SOLO_BEE = {
     "name": "Example: Classroom Elimination Bee",
     "timer_duration_seconds": 60,
     "elimination_mode": True,
+    "game_mode": "individual",
     "teams": [],
     "players": [
         {"name": "Ava Johnson", "age": "9", "grade": "4th", "school": "Maple Grove", "fun_fact": "Has three pet hamsters"},
@@ -73,51 +78,51 @@ SOLO_BEE = {
 }
 
 
-def make_word(session_id, w, player_id=None, team_id=None):
-    word, definition, sentence, pos, origin, alt, difficulty = w
-    return Word(session_id=session_id, player_id=player_id, team_id=team_id, word=word, definition=definition,
-                sentence=sentence, part_of_speech=pos, language_of_origin=origin,
-                alternate_pronunciations=alt, difficulty=difficulty)
+def word_entry(w, **owner):
+    keys = ("word", "definition", "sentence", "part_of_speech", "language_of_origin", "alternate_pronunciations", "difficulty")
+    return {**dict(zip(keys, w)), **owner}
+
+
+def to_roster(spec: dict) -> RosterImport:
+    """Convert a spec above into the import format (the same JSON an AI would paste)."""
+    strip = lambda p: {k: v for k, v in p.items() if k != "words"}
+    words = []
+    for t in spec["teams"]:
+        for p in t["players"]:
+            words += [word_entry(w, player_name=p["name"]) for w in p.get("words", [])]
+        words += [word_entry(w, team_name=t["name"]) for w in t["pool"]]
+    for p in spec.get("players", []):
+        words += [word_entry(w, player_name=p["name"]) for w in p.get("words", [])]
+    words += [word_entry(w) for w in spec["pool"]]
+    return RosterImport.model_validate({
+        "game_mode": spec["game_mode"],
+        "teams": [{"name": t["name"], "color": t["color"], "players": [strip(p) for p in t["players"]]} for t in spec["teams"]],
+        "players": [strip(p) for p in spec.get("players", [])],
+        "words": words,
+    })
 
 
 def seed(db: DbSession, spec: dict):
-    if db.exec(select(Session).where(Session.name == spec["name"])).first():
-        print(f"skip (exists): {spec['name']}")
+    sess = db.exec(select(Session).where(Session.name == spec["name"])).first()
+    is_new = sess is None
+    if is_new:
+        sess = Session(name=spec["name"], timer_duration_seconds=spec["timer_duration_seconds"], elimination_mode=spec["elimination_mode"])
+        db.add(sess)
+        db.flush()
+    try:
+        result = import_roster(db, sess, to_roster(spec))
+    except HTTPException as e:
+        db.rollback()
+        print(f"skipped {spec['name']}: {e.detail}")
         return
-    sess = Session(name=spec["name"], timer_duration_seconds=spec["timer_duration_seconds"], elimination_mode=spec["elimination_mode"])
-    db.add(sess)
-    db.flush()
-
-    order = 0
-    def add_player(p, team_id=None):
-        nonlocal order
-        order += 1
-        player = Player(session_id=sess.id, team_id=team_id, sort_order=order,
-                        **{k: v for k, v in p.items() if k != "words"})
-        db.add(player)
-        db.flush()
-        for w in p.get("words", []):
-            db.add(make_word(sess.id, w, player_id=player.id))
-
-    for t_order, t in enumerate(spec["teams"], start=1):
-        team = Team(session_id=sess.id, name=t["name"], color=t["color"], sort_order=t_order)
-        db.add(team)
-        db.flush()
-        for p in t["players"]:
-            add_player(p, team.id)
-        for w in t["pool"]:
-            db.add(make_word(sess.id, w, team_id=team.id))
-
-    for p in spec.get("players", []):
-        add_player(p)
-    for w in spec["pool"]:
-        db.add(make_word(sess.id, w))
-
     db.commit()
-    print(f"created: {spec['name']} ({sess.id})")
+    print(f"{'created' if is_new else 'updated'}: {spec['name']} ({sess.id}) "
+          f"game_mode={result['game_mode']} created={result['created']} updated={result['updated']}")
 
 
 if __name__ == "__main__":
-    with DbSession(get_engine()) as db:
+    engine = get_engine()
+    engine.echo = False
+    with DbSession(engine) as db:
         for spec in (TEAM_BEE, SOLO_BEE):
             seed(db, spec)

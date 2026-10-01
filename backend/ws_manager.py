@@ -8,21 +8,26 @@ from sqlmodel import Session as SQLSession
 
 class GameState:
     def __init__(self):
-        self.current_player_id: Optional[str] = None
+        self.game_mode: str = 'individual'  # individual, team (mirrors Session.game_mode)
+        self.current_team_id: Optional[str] = None  # team mode: the team at the mic
+        self.current_player_id: Optional[str] = None  # team mode: optional highlighted speller
         self.current_word_id: Optional[str] = None
         self.timer_running: bool = False
         self.timer_seconds_remaining: int = 0
         self.timer_duration: int = 120
         self.revealed_info: set = set()
-        self.display_mode: str = 'idle'  # idle, player_intro, spelling, result, scoreboard
+        self.display_mode: str = 'idle'  # idle, player_intro, team_intro, spelling, result, scoreboard
         self.result: Optional[str] = None  # correct, incorrect, timeout
         self.round_number: int = 1
         # Cached details for broadcast
         self.player_details: Optional[dict] = None
+        self.team_details: Optional[dict] = None
         self.word_details: Optional[dict] = None
 
     def to_dict(self):
         return {
+            "game_mode": self.game_mode,
+            "current_team_id": self.current_team_id,
             "current_player_id": self.current_player_id,
             "current_word_id": self.current_word_id,
             "timer_running": self.timer_running,
@@ -33,6 +38,7 @@ class GameState:
             "result": self.result,
             "round_number": self.round_number,
             "player": self.player_details,
+            "team": self.team_details,
             "word": self.word_details,
         }
 
@@ -43,6 +49,22 @@ def _team_dict(team) -> Optional[dict]:
     return {"id": team.id, "name": team.name, "color": team.color}
 
 
+def _player_dict(player) -> dict:
+    return {
+        "id": player.id,
+        "name": player.name,
+        "age": player.age,
+        "grade": player.grade,
+        "school": player.school,
+        "fun_fact": player.fun_fact,
+        "eliminated": player.eliminated,
+        "elimination_round": player.elimination_round,
+        "sort_order": player.sort_order,
+        "team_id": player.team_id,
+        "team": _team_dict(player.team),
+    }
+
+
 def _fetch_player(player_id: str) -> Optional[dict]:
     """Fetch player details from DB."""
     from models import Player
@@ -50,20 +72,32 @@ def _fetch_player(player_id: str) -> Optional[dict]:
     with SQLSession(engine) as session:
         player = session.get(Player, player_id)
         if player:
+            return _player_dict(player)
+    return None
+
+
+def _fetch_team(team_id: str) -> Optional[dict]:
+    """Fetch team details, including every member, from DB."""
+    from models import Team
+    engine = get_engine()
+    with SQLSession(engine) as session:
+        team = session.get(Team, team_id)
+        if team:
+            members = sorted(team.players, key=lambda p: p.sort_order)
             return {
-                "id": player.id,
-                "name": player.name,
-                "age": player.age,
-                "grade": player.grade,
-                "school": player.school,
-                "fun_fact": player.fun_fact,
-                "eliminated": player.eliminated,
-                "elimination_round": player.elimination_round,
-                "sort_order": player.sort_order,
-                "team_id": player.team_id,
-                "team": _team_dict(player.team),
+                **_team_dict(team),
+                "eliminated": team.eliminated,
+                "members": [_player_dict(p) for p in members],
             }
     return None
+
+
+def _fetch_game_mode(session_id: str) -> str:
+    from models import Session as SessionModel
+    engine = get_engine()
+    with SQLSession(engine) as session:
+        sess = session.get(SessionModel, session_id)
+        return sess.game_mode if sess else "individual"
 
 
 def _fetch_word(word_id: str) -> Optional[dict]:
@@ -90,57 +124,11 @@ def _fetch_word(word_id: str) -> Optional[dict]:
     return None
 
 
-def _fetch_scoreboard(session_id: str) -> tuple[list, list]:
+def _fetch_scoreboard(session_id: str) -> dict:
     """Fetch per-player and per-team scoreboard data from DB."""
-    from models import Player, Team, Turn, Session as SessionModel
-    engine = get_engine()
-    with SQLSession(engine) as session:
-        sess = session.get(SessionModel, session_id)
-        if not sess:
-            return [], []
-
-        teams = session.exec(select(Team).where(Team.session_id == session_id).order_by(Team.sort_order)).all()
-        team_map = {t.id: t for t in teams}
-
-        players = session.exec(select(Player).where(Player.session_id == session_id).order_by(Player.sort_order)).all()
-        turns = session.exec(select(Turn).where(Turn.session_id == session_id)).all()
-
-        scoreboard = []
-        for player in players:
-            player_turns = [t for t in turns if t.player_id == player.id]
-            correct = sum(1 for t in player_turns if t.result == "correct")
-            incorrect = sum(1 for t in player_turns if t.result == "incorrect")
-            timeout = sum(1 for t in player_turns if t.result == "timeout")
-            rounds_survived = player.elimination_round - 1 if player.elimination_round else sess.current_round
-
-            team = team_map.get(player.team_id)
-            scoreboard.append({
-                "player_id": player.id,
-                "player_name": player.name,
-                "team_id": player.team_id,
-                "team_name": team.name if team else None,
-                "team_color": team.color if team else None,
-                "eliminated": player.eliminated,
-                "total_correct": correct,
-                "total_incorrect": incorrect,
-                "total_timeout": timeout,
-                "rounds_survived": rounds_survived,
-            })
-
-        team_scoreboard = []
-        for team in teams:
-            members = [p for p in scoreboard if p["team_id"] == team.id]
-            team_scoreboard.append({
-                "team_id": team.id,
-                "team_name": team.name,
-                "team_color": team.color,
-                "players_count": len(members),
-                "active_count": sum(1 for p in members if not p["eliminated"]),
-                "total_correct": sum(p["total_correct"] for p in members),
-                "total_attempts": sum(p["total_correct"] + p["total_incorrect"] + p["total_timeout"] for p in members),
-            })
-        team_scoreboard.sort(key=lambda t: t["total_correct"], reverse=True)
-        return scoreboard, team_scoreboard
+    from scoring import compute_scoreboard
+    with SQLSession(get_engine()) as session:
+        return compute_scoreboard(session, session_id)
 
 
 class ConnectionManager:
@@ -158,8 +146,9 @@ class ConnectionManager:
         if session_id not in self.active_connections:
             self.active_connections[session_id] = set()
         self.active_connections[session_id].add(ws)
-        # Send initial state
+        # Send initial state; re-read game mode in case it changed in Setup
         state = self.get_state(session_id)
+        state.game_mode = _fetch_game_mode(session_id)
         await ws.send_json({"type": "STATE_UPDATE", "state": state.to_dict()})
 
     def disconnect(self, session_id: str, ws: WebSocket):
@@ -183,7 +172,17 @@ class ConnectionManager:
         state = self.get_state(session_id)
         cmd_type = command.get("type")
 
-        if cmd_type == "SET_ACTIVE_PLAYER":
+        if cmd_type == "SET_ACTIVE_TEAM":
+            state.current_team_id = command.get("team_id")
+            state.team_details = _fetch_team(state.current_team_id) if state.current_team_id else None
+            # A new team clears the previous speller
+            state.current_player_id = None
+            state.player_details = None
+
+        elif cmd_type == "SHOW_TEAM_INTRO":
+            state.display_mode = "team_intro"
+
+        elif cmd_type == "SET_ACTIVE_PLAYER":
             state.current_player_id = command.get("player_id")
             state.player_details = _fetch_player(state.current_player_id) if state.current_player_id else None
 
@@ -192,7 +191,7 @@ class ConnectionManager:
             state.word_details = _fetch_word(state.current_word_id) if state.current_word_id else None
             state.revealed_info.clear()
             state.result = None
-            if state.current_player_id and state.current_word_id:
+            if state.current_word_id and (state.current_player_id or state.current_team_id):
                 state.display_mode = "spelling"
 
         elif cmd_type == "START_TIMER":
@@ -240,6 +239,9 @@ class ConnectionManager:
 
         elif cmd_type == "CLEAR_DISPLAY":
             state.display_mode = "idle"
+            state.game_mode = _fetch_game_mode(session_id)
+            state.current_team_id = None
+            state.team_details = None
             state.current_player_id = None
             state.current_word_id = None
             state.player_details = None
@@ -279,7 +281,9 @@ class ConnectionManager:
 
         # Include scoreboard data when in scoreboard mode
         if state.display_mode == "scoreboard":
-            payload["scoreboard"], payload["team_scoreboard"] = _fetch_scoreboard(session_id)
+            scores = _fetch_scoreboard(session_id)
+            payload["scoreboard"] = scores["players"]
+            payload["team_scoreboard"] = scores["teams"]
 
         await self.broadcast(session_id, payload)
 

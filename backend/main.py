@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 from engine import run_migrations
 
-from routes import sessions, teams, players, words, turns, ws
+from routes import sessions, teams, players, words, turns, roster, ws
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -45,6 +45,7 @@ app.include_router(teams.router)
 app.include_router(players.router)
 app.include_router(words.router)
 app.include_router(turns.router)
+app.include_router(roster.router)
 app.include_router(ws.router)
 
 # Mount static frontend

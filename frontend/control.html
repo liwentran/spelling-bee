@@ -37,10 +37,14 @@
     <!-- Main Content -->
     <div id="main-content" class="p-4 space-y-6 hidden">
 
-        <!-- Players -->
+        <!-- Players (individual mode) / Teams (team mode) -->
         <div>
-            <h3 class="text-sm text-gray-400 mb-2 uppercase tracking-wide">Select Player</h3>
+            <h3 id="select-heading" class="text-sm text-gray-400 mb-2 uppercase tracking-wide">Select Player</h3>
             <div id="player-list" class="flex overflow-x-auto hide-scroll space-x-3 pb-2"></div>
+            <div id="speller-row" class="hidden mt-3">
+                <h3 class="text-xs text-gray-500 mb-2 uppercase tracking-wide">Who's spelling? <span class="normal-case">(optional)</span></h3>
+                <div id="speller-list" class="flex flex-wrap gap-2"></div>
+            </div>
         </div>
 
         <!-- Words -->
@@ -116,8 +120,10 @@
         let players = [];
         let teams = [];
         let words = [];
+        let gameMode = 'individual'; // individual, team (from session; server state is authoritative)
         let selectedPlayerId = null;
-        let wordTab = 'player'; // player, pool, all
+        let selectedTeamId = null; // team mode only
+        let wordTab = 'player'; // player (or team's, in team mode), pool, all
         let timerInterval = null;
         let timerSeconds = 120;
         let timerDuration = 120;
@@ -128,6 +134,9 @@
             main: document.getElementById('main-content'),
             connStatus: document.getElementById('conn-status'),
             playerList: document.getElementById('player-list'),
+            selectHeading: document.getElementById('select-heading'),
+            spellerRow: document.getElementById('speller-row'),
+            spellerList: document.getElementById('speller-list'),
             wordList: document.getElementById('word-list'),
             roundDisplay: document.getElementById('round-display'),
             timerDisplay: document.getElementById('timer-display'),
@@ -169,6 +178,7 @@
                         timerDuration = sess.timer_duration_seconds || 120;
                         timerSeconds = timerDuration;
                         updateTimerDisplay();
+                        setGameMode(sess.game_mode);
 
                         ws.connect(sid);
                         ws.onStateUpdate(handleStateUpdate);
@@ -182,13 +192,33 @@
                         stopTimer();
                     }
                 };
+
+                // Links from Setup's "Copy Controller Link" carry ?session=ID; open that session directly
+                const linked = new URLSearchParams(window.location.search).get('session');
+                if (linked && sessions.some(s => s.id === linked)) {
+                    dom.select.value = linked;
+                    dom.select.dispatchEvent(new Event('change'));
+                }
             } catch (e) { console.error(e); }
+        }
+
+        function setGameMode(mode) {
+            gameMode = mode || 'individual';
+            const isTeam = gameMode === 'team';
+            dom.selectHeading.textContent = isTeam ? 'Select Team' : 'Select Player';
+            tabButtons.player.textContent = isTeam ? "Team's" : "Player's";
+            dom.spellerRow.classList.toggle('hidden', !isTeam || !selectedTeamId);
         }
 
         function handleStateUpdate(msg) {
             const s = msg.state;
             state = s;
             dom.roundDisplay.textContent = `Round ${s.round_number || 1}`;
+            if (s.game_mode && s.game_mode !== gameMode) setGameMode(s.game_mode);
+            if (gameMode === 'team') {
+                selectedTeamId = s.current_team_id;
+                setGameMode(gameMode); // refresh speller row visibility
+            }
 
             // Update selected player from server state
             if (s.current_player_id && s.current_player_id !== selectedPlayerId) {
@@ -260,25 +290,24 @@
 
         // --- Record turn to DB ---
         async function recordTurn(result) {
-            if (!state.current_player_id || !state.current_word_id) return;
+            // Team mode: the team owns the turn (speller optional). Individual mode: the player does.
+            const owner = gameMode === 'team' ? state.current_team_id : state.current_player_id;
+            if (!owner || !state.current_word_id) return;
             const sid = dom.select.value;
             try {
-                await api.fetchTurns(sid); // just to check session exists
-                const resp = await fetch(`/api/sessions/${sid}/turns`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        player_id: state.current_player_id,
-                        word_id: state.current_word_id,
-                        round_number: state.round_number || 1,
-                        result: result,
-                        time_taken_seconds: timerDuration - timerSeconds
-                    })
+                await api.recordTurn(sid, {
+                    team_id: gameMode === 'team' ? state.current_team_id : null,
+                    player_id: state.current_player_id,
+                    word_id: state.current_word_id,
+                    round_number: state.round_number || 1,
+                    result: result,
+                    time_taken_seconds: timerDuration - timerSeconds
                 });
                 // Refresh words to update used status
                 words = await api.fetchWords(sid);
-                // Refresh players for elimination updates
+                // Refresh players/teams for elimination updates
                 players = await api.fetchPlayers(sid);
+                teams = await api.fetchTeams(sid);
                 renderWords();
                 renderPlayers();
             } catch (e) { console.error('Failed to record turn:', e); }
@@ -289,11 +318,45 @@
         const teamColor = (c) => /^#[0-9a-f]{3,8}$/i.test(c || '') ? c : '#eab308';
         const findTeam = (id) => teams.find(t => t.id === id);
 
+        const pillBase = "px-6 py-4 rounded-full text-lg font-bold whitespace-nowrap transition-colors flex-shrink-0";
+
+        function renderTeams() {
+            dom.playerList.innerHTML = teams.map(t => {
+                const isActive = selectedTeamId === t.id;
+                const color = teamColor(t.color);
+                let style = `border: 3px solid ${color};`;
+                let cls = 'bg-gray-800 text-white';
+                if (isActive) { style += `background-color: ${color};`; cls = 'text-black'; }
+                else if (t.eliminated) cls = 'bg-gray-800 text-gray-500 line-through opacity-60';
+                const count = players.filter(p => p.team_id === t.id).length;
+                return `<button onclick="window.selectTeam('${t.id}')" class="${pillBase} ${cls}" style="${style}">${t.name} <span class="text-sm font-normal opacity-70">${count}</span></button>`;
+            }).join('') || '<div class="text-gray-500 py-2">No teams — add them in Setup</div>';
+
+            const members = players.filter(p => p.team_id === selectedTeamId);
+            dom.spellerList.innerHTML = members.map(p => {
+                const isSpeller = state.current_player_id === p.id;
+                return `<button onclick="window.selectSpeller('${p.id}')" class="px-4 py-2 rounded-full text-base font-semibold ${isSpeller ? 'bg-yellow-500 text-black' : 'bg-gray-700 text-white'}">${p.name}</button>`;
+            }).join('') || '<div class="text-gray-500 text-sm">No players on this team</div>';
+        }
+
+        window.selectTeam = (id) => {
+            selectedTeamId = id;
+            ws.setActiveTeam(id);
+            ws.showTeamIntro();
+            setGameMode(gameMode);
+            renderPlayers();
+            renderWords();
+        };
+
+        // Tapping the current speller again clears the highlight
+        window.selectSpeller = (id) => ws.setActivePlayer(state.current_player_id === id ? null : id);
+
         function renderPlayers() {
+            if (gameMode === 'team') return renderTeams();
             dom.playerList.innerHTML = players.map(p => {
                 const isActive = selectedPlayerId === p.id;
                 const isElim = p.eliminated;
-                const baseClass = "px-6 py-4 rounded-full text-lg font-bold whitespace-nowrap transition-colors flex-shrink-0";
+                const baseClass = pillBase;
                 let colorClass = "bg-gray-700 text-white";
                 if (isActive) colorClass = "bg-yellow-500 text-black";
                 else if (isElim) colorClass = "bg-gray-800 text-gray-500 line-through";
@@ -314,7 +377,11 @@
 
         function renderWords() {
             let filtered = words;
-            if (wordTab === 'player' && selectedPlayerId) {
+            if (wordTab === 'player' && gameMode === 'team') {
+                // Team's pool plus every member's own words
+                const memberIds = new Set(players.filter(p => p.team_id === selectedTeamId).map(p => p.id));
+                filtered = selectedTeamId ? words.filter(w => memberIds.has(w.player_id) || (!w.player_id && w.team_id === selectedTeamId)) : [];
+            } else if (wordTab === 'player' && selectedPlayerId) {
                 // Player's own words plus their team's pool
                 const teamId = players.find(p => p.id === selectedPlayerId)?.team_id;
                 filtered = words.filter(w => w.player_id === selectedPlayerId || (teamId && !w.player_id && w.team_id === teamId));
@@ -426,6 +493,7 @@
         document.getElementById('btn-clear').onclick = () => {
             ws.clearDisplay();
             selectedPlayerId = null;
+            selectedTeamId = null;
             stopTimer();
             timerSeconds = timerDuration;
             updateTimerDisplay();

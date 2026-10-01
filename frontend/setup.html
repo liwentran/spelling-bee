@@ -33,10 +33,15 @@
                 <input type="text" id="session-name" placeholder="Session Name" class="w-full p-2 border rounded mb-2">
                 <label class="block text-sm mb-1">Timer Duration (s): <span id="timer-val">120</span></label>
                 <input type="range" id="session-timer" min="30" max="300" value="120" class="w-full mb-2">
-                <label class="flex items-center mb-4">
+                <label class="flex items-center mb-3">
                     <input type="checkbox" id="session-elimination" class="mr-2" checked>
                     Elimination Mode
                 </label>
+                <div class="text-sm mb-1">Game Type</div>
+                <div class="flex gap-4 mb-4 text-sm">
+                    <label class="flex items-center"><input type="radio" name="session-mode" value="individual" class="mr-1.5" checked>👤 Individual</label>
+                    <label class="flex items-center"><input type="radio" name="session-mode" value="team" class="mr-1.5">👥 Team</label>
+                </div>
                 <div class="flex space-x-2">
                     <button id="btn-create-session" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Create</button>
                     <button id="btn-cancel-session" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
@@ -52,7 +57,11 @@
             <div class="bg-white p-4 rounded-lg shadow flex flex-wrap items-center justify-between gap-3 border-l-4 border-yellow-500">
                 <div>
                     <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active Session</span>
-                    <h2 id="active-session-title" class="text-lg font-bold text-gray-800"></h2>
+                    <div class="flex items-center gap-2">
+                        <h2 id="active-session-title" class="text-lg font-bold text-gray-800"></h2>
+                        <span id="mode-badge" class="text-xs font-semibold px-2 py-0.5 rounded-full"></span>
+                        <button id="btn-switch-mode" class="text-xs text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"></button>
+                    </div>
                 </div>
                 <div class="flex items-center space-x-2">
                     <button id="btn-copy-display" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition shadow-sm">
@@ -67,10 +76,32 @@
                 </div>
             </div>
 
-            <!-- Teams -->
+            <!-- AI Import / Export -->
             <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex flex-wrap justify-between items-center gap-2">
+                    <div>
+                        <h2 class="text-xl font-bold">🤖 AI Import / Export</h2>
+                        <p class="text-sm text-gray-500">Copy this session for ChatGPT/Claude, ask for changes, paste the JSON back. Matches by name; never deletes.</p>
+                    </div>
+                    <div class="space-x-2">
+                        <button id="btn-copy-ai" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">Copy for AI</button>
+                        <button id="btn-open-roster-import" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Import JSON</button>
+                    </div>
+                </div>
+                <div id="roster-import-form" class="hidden mt-4">
+                    <textarea id="roster-json" rows="8" class="w-full p-2 border rounded font-mono text-sm mb-2" placeholder='{"game_mode": "team", "teams": [{"name": "Hawks", "players": [{"name": "Ann"}]}], "words": [{"word": "talon", "team_name": "Hawks"}]}'></textarea>
+                    <div class="flex space-x-2">
+                        <button id="btn-roster-import" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Import</button>
+                        <button id="btn-cancel-roster-import" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
+                    </div>
+                </div>
+                <div id="roster-result" class="hidden mt-3 text-sm p-3 rounded border"></div>
+            </div>
+
+            <!-- Teams (team mode only) -->
+            <div id="teams-card" class="bg-white p-6 rounded-lg shadow">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold">Teams <span class="text-sm font-normal text-gray-400">(optional)</span></h2>
+                    <h2 class="text-xl font-bold">Teams <span class="text-sm font-normal text-gray-400">every player needs a team</span></h2>
                     <button id="btn-add-team" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">+ Add Team</button>
                 </div>
 
@@ -101,7 +132,7 @@
                         <option value="">-- No Team --</option>
                     </select>
                     <div class="col-span-2 flex space-x-2 mt-2">
-                        <button id="btn-save-player" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Save</button>
+                        <button id="btn-save-player" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Add Player</button>
                         <button id="btn-cancel-player" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
                     </div>
                 </div>
@@ -178,6 +209,7 @@
             sessionDetails: document.getElementById('session-details'),
             teamList: document.getElementById('team-list'),
             playerTeamSelect: document.getElementById('player-team'),
+            teamsCard: document.getElementById('teams-card'),
             playerList: document.getElementById('player-list'),
             wordList: document.getElementById('word-list'),
             wordPlayerSelect: document.getElementById('word-player'),
@@ -203,8 +235,20 @@
             toggleForm('new-team-form', true);
         };
         document.getElementById('btn-cancel-team').onclick = () => toggleForm('new-team-form', false);
-        document.getElementById('btn-add-player').onclick = () => toggleForm('new-player-form', true);
-        document.getElementById('btn-cancel-player').onclick = () => toggleForm('new-player-form', false);
+        // Player form doubles as the edit form; editingPlayerId set = edit mode
+        let editingPlayerId = null;
+        const PLAYER_INPUTS = { name: 'player-name', age: 'player-age', grade: 'player-grade', school: 'player-school', fun_fact: 'player-fun-fact' };
+        function openPlayerForm(player = null) {
+            editingPlayerId = player?.id || null;
+            Object.entries(PLAYER_INPUTS).forEach(([key, id]) => document.getElementById(id).value = player?.[key] ?? '');
+            dom.playerTeamSelect.value = player?.team_id || '';
+            document.getElementById('btn-save-player').textContent = player ? `Save ${player.name}` : 'Add Player';
+            toggleForm('new-player-form', true);
+            document.getElementById('player-name').focus();
+        }
+        document.getElementById('btn-add-player').onclick = () => openPlayerForm();
+        document.getElementById('btn-cancel-player').onclick = () => { editingPlayerId = null; toggleForm('new-player-form', false); };
+        window.editPlayer = (id) => openPlayerForm(players.find(p => p.id === id));
         document.getElementById('btn-add-word').onclick = () => toggleForm('new-word-form', true);
         document.getElementById('btn-cancel-word').onclick = () => toggleForm('new-word-form', false);
         document.getElementById('btn-import-words').onclick = () => toggleForm('import-words-form', true);
@@ -217,7 +261,7 @@
                     <div class="p-3 border rounded cursor-pointer hover:bg-blue-50 flex justify-between items-center ${currentSession?.id === s.id ? 'bg-blue-100 border-blue-400' : ''}" onclick="window.selectSession('${s.id}')">
                         <div>
                             <div class="font-bold">${s.name}</div>
-                            <div class="text-xs text-gray-500">Players: ${s.players_count ?? (s.players?.length || 0)} | Words: ${s.words_count ?? (s.words?.length || 0)}</div>
+                            <div class="text-xs text-gray-500">${s.game_mode === 'team' ? '👥 Team' : '👤 Individual'} | Players: ${s.players_count ?? (s.players?.length || 0)} | Words: ${s.words_count ?? (s.words?.length || 0)}</div>
                         </div>
                         <div class="flex items-center space-x-1.5">
                             <button onclick="event.stopPropagation(); window.copyDisplayUrl('${s.id}', this)" class="text-xs text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded font-medium flex items-center gap-1" title="Copy Display URL for TV">
@@ -265,10 +309,34 @@
             copyToClipboard(getDisplayUrl(sessionId), btnElement, 'Copied Display URL!');
         };
 
+        const teamMode = () => currentSession?.game_mode === 'team';
+
+        function renderModeBar() {
+            const isTeam = teamMode();
+            const badge = document.getElementById('mode-badge');
+            badge.textContent = isTeam ? '👥 Team game' : '👤 Individual game';
+            badge.className = `text-xs font-semibold px-2 py-0.5 rounded-full ${isTeam ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'}`;
+            const btn = document.getElementById('btn-switch-mode');
+            btn.textContent = `Switch to ${isTeam ? 'individual' : 'team'}`;
+            btn.disabled = currentSession.turns_count > 0;
+            btn.title = btn.disabled ? 'Turns have been played; reset the session to change the game type' : '';
+            dom.teamsCard.classList.toggle('hidden', !isTeam);
+            dom.playerTeamSelect.classList.toggle('hidden', !isTeam);
+        }
+
+        document.getElementById('btn-switch-mode').onclick = async () => {
+            const next = teamMode() ? 'individual' : 'team';
+            try {
+                await api.updateSession(currentSession.id, { game_mode: next });
+            } catch (e) { return alert(e.message); }
+            await window.selectSession(currentSession.id);
+        };
+
         window.selectSession = async (id) => {
             currentSession = await api.getSession(id);
             dom.sessionDetails.classList.remove('hidden');
             document.getElementById('active-session-title').textContent = currentSession.name;
+            renderModeBar();
             
             const btnCopyDisp = document.getElementById('btn-copy-display');
             const btnOpenDisp = document.getElementById('btn-open-display');
@@ -296,7 +364,7 @@
         window.resetSess = async (id) => {
             if(confirm('Reset session progress?')) {
                 await api.resetSession(id);
-                if(currentSession?.id === id) await loadSessionData();
+                if(currentSession?.id === id) await window.selectSession(id); // refresh turn count (unlocks mode switch)
             }
         };
 
@@ -306,7 +374,8 @@
             await api.createSession({
                 name,
                 timer_duration_seconds: parseInt(document.getElementById('session-timer').value),
-                elimination_mode: document.getElementById('session-elimination').checked
+                elimination_mode: document.getElementById('session-elimination').checked,
+                game_mode: document.querySelector('input[name="session-mode"]:checked').value
             });
             toggleForm('new-session-form', false);
             loadSessions();
@@ -317,7 +386,7 @@
             teams = await api.fetchTeams(currentSession.id);
             players = await api.fetchPlayers(currentSession.id);
             words = await api.fetchWords(currentSession.id);
-            if (activeTab.startsWith('team:') && !teams.some(t => `team:${t.id}` === activeTab)) activeTab = 'all';
+            if (activeTab.startsWith('team:') && (!teamMode() || !teams.some(t => `team:${t.id}` === activeTab))) activeTab = 'all';
             renderTeams();
             renderPlayers();
             renderWordTabs();
@@ -338,13 +407,21 @@
                     return `
                     <div class="flex items-center gap-2 border rounded-full pl-2 pr-3 py-1 bg-white shadow-sm">
                         <input type="color" value="${teamColor(t.color)}" onchange="window.setTeamColor('${t.id}', this.value)" class="w-6 h-6 rounded-full cursor-pointer border-0 p-0" title="Change color">
-                        <span class="font-semibold">${t.name}</span>
+                        <button onclick="window.renameTeam('${t.id}')" class="font-semibold hover:underline" title="Rename team">${t.name}</button>
                         <span class="text-xs text-gray-400">${count} player${count === 1 ? '' : 's'}</span>
                         <button onclick="window.deleteTeam('${t.id}')" class="text-red-400 hover:text-red-600 text-sm ml-1" title="Delete team">✕</button>
                     </div>`;
                 }).join('');
             dom.playerTeamSelect.innerHTML = '<option value="">-- No Team --</option>' + teamOptions();
         }
+
+        window.renameTeam = async (id) => {
+            const team = teams.find(t => t.id === id);
+            const name = prompt('Rename team', team.name)?.trim();
+            if (!name || name === team.name) return;
+            await api.updateTeam(currentSession.id, id, { name });
+            loadSessionData();
+        };
 
         window.setTeamColor = async (id, color) => {
             await api.updateTeam(currentSession.id, id, { color });
@@ -369,14 +446,18 @@
 
         function renderPlayers() {
             dom.playerList.innerHTML = players.map(p => {
-                const team = teams.find(t => t.id === p.team_id);
+                const team = teamMode() ? teams.find(t => t.id === p.team_id) : null;
+                const needsTeam = teamMode() && !team;
                 return `
                 <div class="p-3 border rounded bg-white shadow-sm flex justify-between items-center gap-3" ${team ? `style="border-left: 4px solid ${teamColor(team.color)}"` : ''}>
                     <div class="flex-1">
-                        <div class="font-bold">${p.name} ${p.eliminated ? '<span class="text-red-500 text-xs">(Eliminated)</span>' : ''}</div>
-                        <div class="text-xs text-gray-500">${p.grade || ''} ${p.school ? '- ' + p.school : ''}</div>
+                        <div class="font-bold">${p.name} ${p.eliminated ? '<span class="text-red-500 text-xs">(Eliminated)</span>' : ''}
+                            ${needsTeam ? '<span class="text-amber-600 text-xs font-semibold ml-1">⚠ No team — won\'t appear in the game</span>' : ''}</div>
+                        <div class="text-xs text-gray-500">${[p.age ? `Age ${p.age}` : '', p.grade, p.school].filter(Boolean).join(' · ')}</div>
+                        ${p.fun_fact ? `<div class="text-xs text-gray-400 italic truncate max-w-md">"${p.fun_fact}"</div>` : ''}
                     </div>
-                    ${teams.length ? `
+                    <button onclick="window.editPlayer('${p.id}')" class="text-gray-500 hover:text-gray-800" title="Edit player">✏️</button>
+                    ${teamMode() && teams.length ? `
                     <select onchange="window.setPlayerTeam('${p.id}', this.value)" class="text-sm p-1 border rounded">
                         <option value="">No Team</option>${teamOptions(p.team_id)}
                     </select>` : ''}
@@ -400,14 +481,18 @@
         document.getElementById('btn-save-player').onclick = async () => {
             const name = document.getElementById('player-name').value;
             if(!name) return alert('Name required');
-            await api.createPlayer(currentSession.id, {
+            const data = {
                 name,
                 age: document.getElementById('player-age').value || null,
                 grade: document.getElementById('player-grade').value,
                 school: document.getElementById('player-school').value,
                 fun_fact: document.getElementById('player-fun-fact').value,
-                team_id: dom.playerTeamSelect.value || null
-            });
+            };
+            // Individual mode hides the team select; don't clear a team set earlier
+            if (teamMode()) data.team_id = dom.playerTeamSelect.value || null;
+            if (editingPlayerId) await api.updatePlayer(currentSession.id, editingPlayerId, data);
+            else await api.createPlayer(currentSession.id, data);
+            editingPlayerId = null;
             toggleForm('new-player-form', false);
             loadSessionData();
         };
@@ -421,7 +506,7 @@
         const assignmentOptions = (selected = '') => {
             const opt = (value, label) => `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`;
             let html = opt('', '-- Session Pool --');
-            if (teams.length) html += `<optgroup label="Team Pools">${teams.map(t => opt(`team:${t.id}`, t.name)).join('')}</optgroup>`;
+            if (teams.length && (teamMode() || selected.startsWith('team:'))) html += `<optgroup label="Team Pools">${teams.map(t => opt(`team:${t.id}`, t.name)).join('')}</optgroup>`;
             if (players.length) html += `<optgroup label="Players">${players.map(p => opt(`player:${p.id}`, p.name)).join('')}</optgroup>`;
             return html;
         };
@@ -439,7 +524,7 @@
             dom.wordTabs.innerHTML = `
                 <button class="px-4 py-2 border-b-2 ${activeTab === 'all' ? 'border-blue-600 font-semibold' : 'text-gray-500 border-transparent'} hover:text-gray-700 whitespace-nowrap" onclick="window.setTab('all')">All Words</button>
                 <button class="px-4 py-2 border-b-2 ${activeTab === 'pool' ? 'border-blue-600 font-semibold' : 'text-gray-500 border-transparent'} hover:text-gray-700 whitespace-nowrap" onclick="window.setTab('pool')">Session Pool</button>
-            ` + teams.map(t => `
+            ` + (teamMode() ? teams : []).map(t => `
                 <button class="px-4 py-2 border-b-2 ${activeTab === `team:${t.id}` ? 'border-blue-600 font-semibold' : 'text-gray-500 border-transparent'} hover:text-gray-700 whitespace-nowrap" onclick="window.setTab('team:${t.id}')"><span class="inline-block w-2 h-2 rounded-full mr-1" style="background-color: ${teamColor(t.color)}"></span>${t.name}</button>
             `).join('') + players.map(p => `
                 <button class="px-4 py-2 border-b-2 ${activeTab === p.id ? 'border-blue-600 font-semibold' : 'text-gray-500 border-transparent'} hover:text-gray-700 whitespace-nowrap" onclick="window.setTab('${p.id}')">${p.name}</button>
@@ -512,6 +597,45 @@
                 loadSessionData();
             } catch (e) {
                 alert('Invalid JSON: ' + e.message);
+            }
+        };
+
+        // --- AI Import / Export ---
+        const AI_INSTRUCTIONS = `Below is my spelling bee setup as JSON. Change it however I ask after the JSON, then reply with ONLY the complete JSON in the same format.
+Rules:
+- "game_mode" is "individual" or "team". In a team game, list each player inside their team's "players".
+- Teams and players are matched by name: keep a name exactly the same to update that entry; a new name adds a new one.
+- Fields you leave out stay unchanged. Nothing is ever deleted, so just leave out anything you don't want to touch.
+- Words: "player_name" gives a word to one player, "team_name" puts it in a team's pool, neither puts it in the shared pool. "difficulty" is 1-5.
+- Player fields: name, age, grade, school, fun_fact. Word fields: word, definition, sentence, part_of_speech, language_of_origin, alternate_pronunciations, difficulty.`;
+
+        document.getElementById('btn-copy-ai').onclick = async (e) => {
+            const data = await api.exportSession(currentSession.id);
+            copyToClipboard(`${AI_INSTRUCTIONS}\n\n${JSON.stringify(data, null, 2)}\n\nMy changes: `, e.currentTarget, 'Copied! Paste into your AI');
+        };
+        document.getElementById('btn-open-roster-import').onclick = () => toggleForm('roster-import-form', true);
+        document.getElementById('btn-cancel-roster-import').onclick = () => toggleForm('roster-import-form', false);
+
+        document.getElementById('btn-roster-import').onclick = async () => {
+            const resultEl = document.getElementById('roster-result');
+            const raw = document.getElementById('roster-json').value;
+            // AIs often wrap JSON in ```json fences or add a sentence around it; take the outermost {...}
+            const start = raw.indexOf('{'), end = raw.lastIndexOf('}');
+            let data;
+            try { data = JSON.parse(raw.slice(start, end + 1)); }
+            catch (e) { return alert('Could not find valid JSON: ' + e.message); }
+            try {
+                const res = await api.importSession(currentSession.id, data);
+                const fmt = (o) => Object.entries(o).map(([k, v]) => `${v} ${k}`).join(', ');
+                resultEl.className = `mt-3 text-sm p-3 rounded border ${res.warnings.length ? 'bg-amber-50 border-amber-300' : 'bg-green-50 border-green-300'}`;
+                resultEl.innerHTML = `<b>Imported.</b> Created ${fmt(res.created)}. Updated ${fmt(res.updated)}.` +
+                    (res.warnings.length ? `<ul class="list-disc ml-5 mt-1">${res.warnings.map(w => `<li>${w}</li>`).join('')}</ul>` : '');
+                document.getElementById('roster-json').value = '';
+                toggleForm('roster-import-form', false);
+                await window.selectSession(currentSession.id); // game mode may have changed
+            } catch (e) {
+                resultEl.className = 'mt-3 text-sm p-3 rounded border bg-red-50 border-red-300';
+                resultEl.textContent = 'Import failed: ' + e.message;
             }
         };
 

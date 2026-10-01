@@ -10,6 +10,7 @@ class Session(SQLModel, table=True):
     name: str
     timer_duration_seconds: int = Field(default=120)
     elimination_mode: bool = Field(default=False)
+    game_mode: str = Field(default="individual")  # individual, team
     status: str = Field(default="setup")  # setup, active, completed
     current_round: int = Field(default=1)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -25,6 +26,8 @@ class Team(SQLModel, table=True):
     session_id: str = Field(foreign_key="sessions.id")
     name: str
     color: Optional[str] = None  # hex, e.g. #f59e0b
+    eliminated: bool = Field(default=False)
+    elimination_round: Optional[int] = None
     sort_order: int = Field(default=0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -32,6 +35,7 @@ class Team(SQLModel, table=True):
     # No delete cascade: deleting a team unassigns its players/words (team_id -> NULL)
     players: List["Player"] = Relationship(back_populates="team")
     words: List["Word"] = Relationship(back_populates="team")
+    turns: List["Turn"] = Relationship(back_populates="team", cascade_delete=True)
 
 class Player(SQLModel, table=True):
     __tablename__ = "players"
@@ -78,7 +82,8 @@ class Turn(SQLModel, table=True):
     __tablename__ = "turns"
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     session_id: str = Field(foreign_key="sessions.id")
-    player_id: str = Field(foreign_key="players.id")
+    player_id: Optional[str] = Field(default=None, foreign_key="players.id")  # team mode: optional speller
+    team_id: Optional[str] = Field(default=None, foreign_key="teams.id")  # set in team mode
     word_id: str = Field(foreign_key="words.id")
     round_number: int
     result: str  # correct, incorrect, timeout
@@ -87,4 +92,5 @@ class Turn(SQLModel, table=True):
     
     session: Optional[Session] = Relationship(back_populates="turns")
     player: Optional[Player] = Relationship(back_populates="turns")
+    team: Optional[Team] = Relationship(back_populates="turns")
     word: Optional[Word] = Relationship(back_populates="turns")
