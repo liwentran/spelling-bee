@@ -46,6 +46,7 @@ app.include_router(players.router)
 app.include_router(words.router)
 app.include_router(turns.router)
 app.include_router(roster.router)
+app.include_router(roster.create_router)
 app.include_router(ws.router)
 
 # Mount static frontend

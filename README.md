@@ -89,7 +89,7 @@ Then go back to step 1 for the next speller.
 - 📊 **Scoreboard** with elimination tracking
 - 👥 **Individual or team games**: team intros show every member, with team scoring and elimination
 - 🗣️ **Text-to-speech**: the TV pronounces the word and reads hints aloud as they're revealed
-- 🤖 **AI-friendly setup**: export a whole session for ChatGPT/Claude, then paste the edited JSON back in
+- 🤖 **Sessions as JSON**: define a whole bee (settings, teams, players, words) in one JSON document. Have ChatGPT/Claude write or edit it, then paste it in
 
 ## Deployment
 
@@ -105,30 +105,50 @@ make logs              # tail the deployed container's logs
 - **Local and production share one database** (`spellingbee` in `general-db`). `make up` runs migrations on startup, so a new migration hits production as soon as you run it locally, even before the code that uses it is deployed. Keep migrations backward compatible, and deploy soon after.
 - **Backups:** a nightly cron at 3:00 AM on the droplet (`/root/cafe/backup_db.sh`) dumps every database to [`gs://liwentran.com/db_backups/`](https://console.cloud.google.com/storage/browser/liwentran.com/db_backups) and keeps 7 days locally. The spelling bee files are `spellingbee_db_<timestamp>.dump`. To restore one: `pg_restore -U postgres -d spellingbee --clean <file>`.
 
-## AI Import / Export
+## Defining a Session in JSON
 
-In Setup, **Copy for AI** copies the session's JSON plus instructions. Paste it into ChatGPT or Claude and ask for changes, such as "add a third team with 3 players and 5 hard words each" or "fill in fun facts". Then paste the reply into **Import JSON**. It's the same format as `GET`/`POST /api/sessions/{id}/export|import`:
+A whole session can be one JSON document: its name, game type, time per word, elimination setting, teams, players and words. The same format is used everywhere:
+
+| Where | What it does |
+|---|---|
+| Setup → **+ New Session** → **From JSON** | Create a brand-new session from JSON (`POST /api/sessions/import`). **Copy blank template for AI** gives ChatGPT/Claude the format and rules to write one for you. |
+| Setup → **Copy for AI** / **Import JSON** | Export the open session, have an AI edit it, and paste it back (`GET`/`POST /api/sessions/{id}/export\|import`) |
+| [`examples/*.json`](examples/) | The demo sessions, loaded by `make seed`. Copy one as a starting point. |
 
 ```json
 {
+  "name": "Spring Team Bee",
   "game_mode": "team",
+  "timer_duration_seconds": 90,
+  "elimination_mode": true,
   "teams": [
     { "name": "Honeybees", "color": "#f59e0b",
       "players": [{ "name": "Maya Chen", "age": "11", "grade": "6th", "school": "Lincoln Middle", "fun_fact": "..." }] }
   ],
   "players": [],
   "words": [
-    { "word": "apiary", "definition": "a place where bees are kept", "difficulty": 3, "team_name": "Honeybees" },
+    { "word": "apiary", "definition": "a place where bees are kept", "sentence": "...", "part_of_speech": "noun",
+      "language_of_origin": "Latin", "alternate_pronunciations": "AY-pee-air-ee", "difficulty": 3, "team_name": "Honeybees" },
     { "word": "mnemonic", "player_name": "Maya Chen" },
     { "word": "weird" }
   ]
 }
 ```
 
+| Field | Meaning |
+|---|---|
+| `name` | Session name. Required when creating; on import into an open session it renames it. |
+| `game_mode` | `"individual"` or `"team"`. Can't change after the first turn until you Reset. |
+| `timer_duration_seconds` | Time per word, 15–600. |
+| `elimination_mode` | `true` if a miss knocks out the speller, or the whole team in a team game. |
+| `teams[].players` | Team members, in a team game. |
+| `players` | Players with no team, in an individual game. A `"team_name"` on one of them assigns them to a team. |
+| `words[]` | `player_name` gives a word to one player, `team_name` puts it in a team's pool, neither puts it in the shared pool. `difficulty` is 1–5. |
+
+Import rules:
 - Teams and players are **matched by name**, case-insensitively. A matching name updates that entry; a new name creates one.
-- Only the fields you include change. **Nothing is ever deleted.**
+- Only the fields you include change, and `null` settings are ignored. **Nothing is ever deleted.**
 - Words with an unknown `player_name`/`team_name` are skipped, with a warning.
-- `players` at the top level are players with no team. A `"team_name"` on one of them assigns it to a team.
 
 ## Bulk Word Import Format
 
@@ -156,7 +176,7 @@ Use `player_name` to give a word to one player, `team_name` to put it in a team'
 
 ## Example Data
 
-`make seed` sets up three demo sessions. It's safe to re-run: it goes through the same import as above, so existing sessions are updated in place and anything added by hand is kept.
+`make seed` loads every file in [`examples/`](examples/) (`national-bee.json`, `team-bee.json`, `classroom-bee.json`). It's safe to re-run: sessions are matched by name and updated in place, and anything added by hand is kept. To add an example, drop another JSON file there.
 
 - **National Spelling Bee Demo**: an individual elimination bee with a 2-minute timer and finalists working through real past Scripps National Spelling Bee winning words (*stichomythia*, *feuilleton*, *nunatak*, …), plus a 12-word championship pool for tiebreakers.
 - **Example: Team Bee**: a team game, Honeybees vs Bumblebees, with 3 players per team. The TV team intro shows all three member cards. Each player has their own words, each team has a pool of bee-themed words, and there's a shared tiebreaker pool.

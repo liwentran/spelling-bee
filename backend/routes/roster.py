@@ -1,17 +1,20 @@
-"""Whole-session export/import, designed for round-tripping through an AI assistant.
+"""Whole-session JSON: settings, teams, players and words in one document.
 
+Designed for round-tripping through an AI assistant and for the example files in /examples.
 Import upserts by name (case-insensitive) and never deletes: anything missing from the
 JSON is left alone, and only the fields present in the JSON are changed.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session as DbSession, select
 from typing import List, Optional, Literal
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from database import get_session
 from models import Session, Team, Player, Word
 
 router = APIRouter(prefix="/api/sessions/{session_id}", tags=["roster"])
+create_router = APIRouter(prefix="/api/sessions", tags=["roster"])  # create a new session from JSON
 
+SESSION_FIELDS = ("name", "timer_duration_seconds", "elimination_mode")
 PLAYER_FIELDS = ("name", "age", "grade", "school", "fun_fact")
 # Fields an import may change on an existing match; names are the match key, so they're never rewritten
 PLAYER_UPDATE_FIELDS = ("age", "grade", "school", "fun_fact", "team_id")
@@ -43,7 +46,11 @@ class RosterWord(BaseModel):
     team_name: Optional[str] = None
 
 class RosterImport(BaseModel):
+    # Session settings (all optional on import; name is required to create a new session)
+    name: Optional[str] = None
     game_mode: Optional[Literal["individual", "team"]] = None
+    timer_duration_seconds: Optional[int] = Field(default=None, ge=15, le=600)  # time per word
+    elimination_mode: Optional[bool] = None
     teams: List[RosterTeam] = []
     players: List[RosterPlayer] = []
     words: List[RosterWord] = []
@@ -69,7 +76,10 @@ def import_roster(db: DbSession, session: Session, roster: RosterImport) -> dict
         if session.turns:
             raise HTTPException(status_code=400, detail="Can't change game mode after turns are recorded; reset the session first")
         session.game_mode = roster.game_mode
-        db.add(session)
+    settings = roster.model_dump(exclude_unset=True, include={"name", "timer_duration_seconds", "elimination_mode"})
+    settings = {k: v for k, v in settings.items() if v is not None}  # null means "leave as is"
+    session_updated = _apply(session, settings, SESSION_FIELDS)
+    db.add(session)
 
     teams = {t.name.lower(): t for t in db.exec(select(Team).where(Team.session_id == session.id)).all()}
     players = {p.name.lower(): p for p in db.exec(select(Player).where(Player.session_id == session.id)).all()}
@@ -145,7 +155,18 @@ def import_roster(db: DbSession, session: Session, roster: RosterImport) -> dict
             updated["words"] += 1
         db.add(word)
 
-    return {"ok": True, "game_mode": session.game_mode, "created": created, "updated": updated, "warnings": warnings}
+    return {"ok": True, "session_id": session.id, "game_mode": session.game_mode, "session_updated": session_updated,
+            "created": created, "updated": updated, "warnings": warnings}
+
+
+def create_session_from_roster(db: DbSession, roster: RosterImport) -> dict:
+    """Create a new session from a full JSON definition. Caller commits."""
+    if not roster.name or not roster.name.strip():
+        raise HTTPException(status_code=400, detail='"name" is required to create a session')
+    session = Session(name=roster.name.strip(), game_mode=roster.game_mode or "individual")
+    db.add(session)
+    db.flush()
+    return import_roster(db, session, roster)
 
 
 @router.get("/export")
@@ -171,7 +192,10 @@ def export_roster(session_id: str, db: DbSession = Depends(get_session)):
         word_out.append(entry)
 
     return {
+        "name": session.name,
         "game_mode": session.game_mode,
+        "timer_duration_seconds": session.timer_duration_seconds,
+        "elimination_mode": session.elimination_mode,
         "teams": [{"name": t.name, "color": t.color,
                    "players": [player_out(p) for p in players if p.team_id == t.id]} for t in teams],
         "players": [player_out(p) for p in players if not p.team_id],
@@ -185,5 +209,12 @@ def import_roster_route(session_id: str, roster: RosterImport, db: DbSession = D
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     result = import_roster(db, session, roster)
+    db.commit()
+    return result
+
+
+@create_router.post("/import")
+def create_session_route(roster: RosterImport, db: DbSession = Depends(get_session)):
+    result = create_session_from_roster(db, roster)
     db.commit()
     return result

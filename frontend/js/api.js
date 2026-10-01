@@ -48,6 +48,7 @@ export async function updateTeam(sessionId, teamId, data) { return request(`/ses
 export async function deleteTeam(sessionId, teamId) { return request(`/sessions/${sessionId}/teams/${teamId}`, { method: 'DELETE' }); }
 
 // Roster (whole-session import/export, used for AI round-trips)
+export async function createSessionFromJson(data) { return request('/sessions/import', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(data) }); }
 export async function exportSession(sessionId) { return request(`/sessions/${sessionId}/export`); }
 export async function importSession(sessionId, data) { return request(`/sessions/${sessionId}/import`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify(data) }); }
 export async function recordTurn(sessionId, data) { return request(`/sessions/${sessionId}/turns/`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify(data) }); }

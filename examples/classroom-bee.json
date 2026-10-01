@@ -1,0 +1,178 @@
+{
+  "name": "Example: Classroom Elimination Bee",
+  "game_mode": "individual",
+  "timer_duration_seconds": 60,
+  "elimination_mode": true,
+  "teams": [],
+  "players": [
+    {
+      "name": "Ava Johnson",
+      "age": "9",
+      "grade": "4th",
+      "school": "Maple Grove",
+      "fun_fact": "Has three pet hamsters"
+    },
+    {
+      "name": "Liam Nguyen",
+      "age": "10",
+      "grade": "4th",
+      "school": "Maple Grove",
+      "fun_fact": "Wants to be an astronaut"
+    },
+    {
+      "name": "Zoe Williams",
+      "age": "9",
+      "grade": "4th",
+      "school": "Maple Grove",
+      "fun_fact": "Knows all 50 state capitals"
+    }
+  ],
+  "words": [
+    {
+      "word": "hamster",
+      "definition": "A small furry rodent often kept as a pet",
+      "sentence": "My hamster runs on his wheel all night.",
+      "part_of_speech": "noun",
+      "language_of_origin": "German",
+      "difficulty": 1,
+      "player_name": "Ava Johnson"
+    },
+    {
+      "word": "neighbor",
+      "definition": "A person who lives next door or nearby",
+      "sentence": "Our neighbor feeds the hamsters when we travel.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Old English",
+      "difficulty": 2,
+      "player_name": "Ava Johnson"
+    },
+    {
+      "word": "beautiful",
+      "definition": "Pleasing to look at",
+      "sentence": "The sunset was beautiful tonight.",
+      "part_of_speech": "adjective",
+      "language_of_origin": "French",
+      "difficulty": 2,
+      "player_name": "Ava Johnson"
+    },
+    {
+      "word": "planet",
+      "definition": "A large round object in space that travels around a star",
+      "sentence": "Mars is the fourth planet from the sun.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "difficulty": 1,
+      "player_name": "Liam Nguyen"
+    },
+    {
+      "word": "gravity",
+      "definition": "The force that pulls objects toward the earth",
+      "sentence": "Gravity keeps our feet on the ground.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Latin",
+      "difficulty": 2,
+      "player_name": "Liam Nguyen"
+    },
+    {
+      "word": "astronaut",
+      "definition": "A person trained to travel in a spacecraft",
+      "sentence": "The astronaut floated inside the space station.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "difficulty": 2,
+      "player_name": "Liam Nguyen"
+    },
+    {
+      "word": "capital",
+      "definition": "The city where a state or country's government is located",
+      "sentence": "Sacramento is the capital of California.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Latin",
+      "difficulty": 1,
+      "player_name": "Zoe Williams"
+    },
+    {
+      "word": "geography",
+      "definition": "The study of the earth's land, water, and people",
+      "sentence": "Zoe's favorite subject is geography.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "difficulty": 2,
+      "player_name": "Zoe Williams"
+    },
+    {
+      "word": "Mississippi",
+      "definition": "A large river and a state in the southern United States",
+      "sentence": "The Mississippi River flows into the Gulf of Mexico.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Ojibwe",
+      "difficulty": 2,
+      "player_name": "Zoe Williams"
+    },
+    {
+      "word": "because",
+      "definition": "For the reason that",
+      "sentence": "We stayed inside because it was raining.",
+      "part_of_speech": "conjunction",
+      "language_of_origin": "Middle English",
+      "difficulty": 1
+    },
+    {
+      "word": "friend",
+      "definition": "A person you know well and like",
+      "sentence": "My friend shared her lunch with me.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Old English",
+      "difficulty": 1
+    },
+    {
+      "word": "necessary",
+      "definition": "Needed to be done or achieved; essential",
+      "sentence": "Water is necessary for plants to grow.",
+      "part_of_speech": "adjective",
+      "language_of_origin": "Latin",
+      "difficulty": 2
+    },
+    {
+      "word": "separate",
+      "definition": "To move or keep apart",
+      "sentence": "Please separate the red blocks from the blue ones.",
+      "part_of_speech": "verb",
+      "language_of_origin": "Latin",
+      "difficulty": 2
+    },
+    {
+      "word": "library",
+      "definition": "A building or room containing books to read or borrow",
+      "sentence": "We visit the library every Friday.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Latin",
+      "difficulty": 1
+    },
+    {
+      "word": "February",
+      "definition": "The second month of the year",
+      "sentence": "My birthday is in February.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Latin",
+      "alternate_pronunciations": "FEB-yoo-air-ee",
+      "difficulty": 2
+    },
+    {
+      "word": "Wednesday",
+      "definition": "The day of the week after Tuesday",
+      "sentence": "We have art class on Wednesday.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Old English",
+      "difficulty": 2
+    },
+    {
+      "word": "caterpillar",
+      "definition": "The larva of a butterfly or moth",
+      "sentence": "The caterpillar munched on a leaf.",
+      "part_of_speech": "noun",
+      "language_of_origin": "French",
+      "difficulty": 2
+    }
+  ]
+}

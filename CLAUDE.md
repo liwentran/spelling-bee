@@ -21,10 +21,12 @@ backend/
   database.py        lazy engine from DATABASE_URL; get_session() dependency
   ws_manager.py      in-memory GameState per session + WS command handler + broadcast
   scoring.py         compute_scoreboard(): the one scoreboard calculation (REST /turns/scoreboard and WS)
-  seed_examples.py   example sessions, loaded through roster.import_roster
+  seed_examples.py   loads /examples/*.json through roster (match by session name)
+examples/            example sessions as full JSON definitions (also templates for users/AI)
   routes/            one router per resource, all under /api/sessions/{session_id}/...
     teams.py         also exports validate_team(), used by players.py and words.py
-    roster.py        GET /export + POST /import of a whole session (AI round-trip); import_roster() upsert
+    roster.py        whole-session JSON: GET /{id}/export, POST /{id}/import, POST /api/sessions/import (create);
+                     import_roster() upsert + create_session_from_roster(). RosterImport is the format.
   alembic/versions/  hand-written migrations, numbered 001, 002, ... (revision ids are '001', '002')
 frontend/
   js/api.js          REST wrappers (one exported function per endpoint)
@@ -39,7 +41,7 @@ The DB is Postgres on a remote droplet (`general-db`), reached through an SSH tu
 
 - `make up` (alias `make dev`): opens the tunnel and runs uvicorn with reload on :8003. The app is at http://localhost:8003/. Only this local server picks up edits automatically. The droplet (http://143.244.162.12:8003) changes only after push + `make deploy`, so a missing feature there usually means "not deployed".
 - `make migrate`: runs `alembic upgrade head` against the tunneled DB. Migrations also run automatically on app startup.
-- `make seed`: migrates, then runs `backend/seed_examples.py`, which upserts two example sessions (a team-mode bee and a solo elimination bee) through `import_roster`. Rerunning it updates them in place. Use these sessions for manual testing, and extend the script when you add features worth demoing.
+- `make seed`: migrates, then runs `backend/seed_examples.py`, which loads every `examples/*.json` (matched by session name, upserted through `roster.py`). Rerunning it updates them in place. To change example data, edit the JSON, not Python. Use these sessions for manual testing, and extend the script when you add features worth demoing.
 - `make db-shell` / `make db-status`: psql on the droplet.
 - `make deploy` / `make logs` / `make restart`: see "Droplet & deployment" below.
 
@@ -111,7 +113,8 @@ Both modes share the same frontend pages, which branch on `game_mode`: the contr
 
   In the controller, the "Player's" tab shows the player's own words plus their team's pool. The "Pool" tab shows only the session pool.
 - `Turn` records a judged attempt. `POST /turns` also marks the word `used` and, in elimination mode, eliminates the player (individual) or the team (team) on a non-correct result. Reset clears turns and both kinds of elimination.
-- **Roster import** (`routes/roster.py`) upserts teams, players and words **by name, case-insensitively**. It never deletes or renames, because names are the match key. Only the fields present in the JSON change: `model_dump(exclude_unset=True)` plus `_apply()`. Words match on (text, owner). The Setup "Copy for AI" instructions describe these rules, so keep them in sync if you change the semantics.
+- **Session JSON** (`routes/roster.py`, model `RosterImport`) is the full definition: session settings (`name`, `game_mode`, `timer_duration_seconds` 15–600, `elimination_mode`), teams, players and words. Export emits all of it. Import applies only what is present, and `null` settings mean "leave as is". If you add a Session field users should control, add it to `RosterImport`, `SESSION_FIELDS`, the export, `JSON_RULES`/`BLANK_TEMPLATE` in setup.html, and the README field table.
+- **Roster import** upserts teams, players and words **by name, case-insensitively**. It never deletes, and never renames teams or players, because their names are the match key (the session `name` setting does rename the session). Only the fields present in the JSON change: `model_dump(exclude_unset=True)` plus `_apply()`. Words match on (text, owner). The Setup "Copy for AI" instructions describe these rules, so keep them in sync if you change the semantics.
 - **SQLAlchemy pitfall:** after `db.delete()`-ing children, don't `db.add()` an already-persistent parent whose loaded collection still holds them. A lazy load in between autoflushes the deletes, and the re-add's save-update cascade then raises "Instance … has been deleted". This is why Reset returned a 500 whenever turns existed. Tracked objects don't need `db.add()` at all.
 - `Session.status` and `current_round` exist in the DB, but the live round number is `GameState.round_number`, which is in memory.
 - Timestamps are timezone-aware UTC (`datetime.now(timezone.utc)`).

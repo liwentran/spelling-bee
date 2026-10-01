@@ -1,0 +1,228 @@
+{
+  "name": "National Spelling Bee Demo",
+  "game_mode": "individual",
+  "timer_duration_seconds": 120,
+  "elimination_mode": true,
+  "teams": [],
+  "players": [
+    {
+      "name": "Amara Okafor",
+      "age": "13",
+      "grade": "8th",
+      "school": "Riverside Academy",
+      "fun_fact": "Has memorized the first 200 digits of pi"
+    },
+    {
+      "name": "Lucas Moreau",
+      "age": "14",
+      "grade": "8th",
+      "school": "Pine Ridge Middle",
+      "fun_fact": "Speaks three languages at home"
+    },
+    {
+      "name": "Sofia Ramirez",
+      "age": "12",
+      "grade": "7th",
+      "school": "Lakeview Middle",
+      "fun_fact": "Writes her own fantasy novels"
+    }
+  ],
+  "words": [
+    {
+      "word": "stichomythia",
+      "definition": "Dialogue in alternating single lines, as in classical Greek drama",
+      "sentence": "The play's tense stichomythia had the actors trading sharp one-line retorts.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "alternate_pronunciations": "stik-oh-MITH-ee-uh",
+      "difficulty": 5,
+      "player_name": "Amara Okafor"
+    },
+    {
+      "word": "cymotrichous",
+      "definition": "Having wavy hair",
+      "sentence": "The portrait showed a cymotrichous poet gazing out to sea.",
+      "part_of_speech": "adjective",
+      "language_of_origin": "Greek",
+      "alternate_pronunciations": "sy-MAH-trih-kus",
+      "difficulty": 5,
+      "player_name": "Amara Okafor"
+    },
+    {
+      "word": "appoggiatura",
+      "definition": "An ornamental grace note that leans into the main note of a melody",
+      "sentence": "The violinist added an appoggiatura before the final chord.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Italian",
+      "alternate_pronunciations": "uh-pah-juh-TOOR-uh",
+      "difficulty": 5,
+      "player_name": "Amara Okafor"
+    },
+    {
+      "word": "feuilleton",
+      "definition": "The part of a European newspaper devoted to light fiction, reviews, and essays",
+      "sentence": "He read the feuilleton before the front-page news.",
+      "part_of_speech": "noun",
+      "language_of_origin": "French",
+      "alternate_pronunciations": "FOY-uh-tawn",
+      "difficulty": 5,
+      "player_name": "Lucas Moreau"
+    },
+    {
+      "word": "guetapens",
+      "definition": "An ambush, snare, or trap",
+      "sentence": "The mountain pass was a perfect guetapens for the unwary traveler.",
+      "part_of_speech": "noun",
+      "language_of_origin": "French",
+      "alternate_pronunciations": "GET-uh-pahn",
+      "difficulty": 5,
+      "player_name": "Lucas Moreau"
+    },
+    {
+      "word": "Ursprache",
+      "definition": "A parent language, especially one reconstructed from its descendants",
+      "sentence": "Linguists reconstructed the Ursprache from dozens of modern languages.",
+      "part_of_speech": "noun",
+      "language_of_origin": "German",
+      "alternate_pronunciations": "OOR-shprah-kuh",
+      "difficulty": 5,
+      "player_name": "Lucas Moreau"
+    },
+    {
+      "word": "nunatak",
+      "definition": "A mountain peak that sticks up through a glacier or ice sheet",
+      "sentence": "From the plane they spotted a lone nunatak rising above the ice.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Inuit",
+      "alternate_pronunciations": "NUN-uh-tak",
+      "difficulty": 5,
+      "player_name": "Sofia Ramirez"
+    },
+    {
+      "word": "scherenschnitte",
+      "definition": "The art of cutting intricate designs out of paper",
+      "sentence": "Her scherenschnitte of a winter forest won first prize.",
+      "part_of_speech": "noun",
+      "language_of_origin": "German",
+      "alternate_pronunciations": "SHARE-en-shnit-uh",
+      "difficulty": 5,
+      "player_name": "Sofia Ramirez"
+    },
+    {
+      "word": "Laodicean",
+      "definition": "Lukewarm or indifferent, especially about religion or politics",
+      "sentence": "His Laodicean attitude toward the election surprised his friends.",
+      "part_of_speech": "adjective",
+      "language_of_origin": "Greek",
+      "alternate_pronunciations": "lay-ah-duh-SEE-un",
+      "difficulty": 5,
+      "player_name": "Sofia Ramirez"
+    },
+    {
+      "word": "abseil",
+      "definition": "To descend a rock face or wall using a rope",
+      "sentence": "The climbers abseiled down the cliff before sunset.",
+      "part_of_speech": "verb",
+      "language_of_origin": "German",
+      "alternate_pronunciations": "AB-sayl",
+      "difficulty": 4
+    },
+    {
+      "word": "moorhen",
+      "definition": "A dark water bird of the rail family with a red bill",
+      "sentence": "A moorhen paddled through the reeds at the pond's edge.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Old English",
+      "difficulty": 4
+    },
+    {
+      "word": "Murraya",
+      "definition": "A genus of tropical trees and shrubs that includes the curry leaf tree",
+      "sentence": "The Murraya in the greenhouse smelled of citrus blossoms.",
+      "part_of_speech": "noun",
+      "language_of_origin": "New Latin",
+      "difficulty": 5
+    },
+    {
+      "word": "koinonia",
+      "definition": "Christian fellowship or communion within a community",
+      "sentence": "The retreat was meant to build koinonia among the members.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "alternate_pronunciations": "koy-noh-NEE-uh",
+      "difficulty": 5
+    },
+    {
+      "word": "marocain",
+      "definition": "A dress fabric of ribbed crepe",
+      "sentence": "Her gown was sewn from ivory marocain.",
+      "part_of_speech": "noun",
+      "language_of_origin": "French",
+      "alternate_pronunciations": "mar-uh-KAYN",
+      "difficulty": 5
+    },
+    {
+      "word": "gesellschaft",
+      "definition": "A social relationship based on impersonal ties, as in a modern society",
+      "sentence": "The sociologist contrasted village life with the gesellschaft of the city.",
+      "part_of_speech": "noun",
+      "language_of_origin": "German",
+      "alternate_pronunciations": "guh-ZEL-shahft",
+      "difficulty": 5
+    },
+    {
+      "word": "knaidel",
+      "definition": "A small dumpling, especially a matzo ball",
+      "sentence": "Grandma served one giant knaidel in each bowl of soup.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Yiddish",
+      "alternate_pronunciations": "KNAY-dul",
+      "difficulty": 4
+    },
+    {
+      "word": "stromuhr",
+      "definition": "An instrument that measures the speed of blood flow",
+      "sentence": "The researchers used a stromuhr to measure blood flow in the artery.",
+      "part_of_speech": "noun",
+      "language_of_origin": "German",
+      "alternate_pronunciations": "SHTROH-moor",
+      "difficulty": 5
+    },
+    {
+      "word": "guerdon",
+      "definition": "A reward or recompense",
+      "sentence": "The knight's only guerdon was the king's gratitude.",
+      "part_of_speech": "noun",
+      "language_of_origin": "French",
+      "alternate_pronunciations": "GUR-dun",
+      "difficulty": 4
+    },
+    {
+      "word": "serrefine",
+      "definition": "A small spring forceps used to clamp a blood vessel",
+      "sentence": "The surgeon placed a serrefine on the bleeding vessel.",
+      "part_of_speech": "noun",
+      "language_of_origin": "French",
+      "alternate_pronunciations": "sair-FEEN",
+      "difficulty": 5
+    },
+    {
+      "word": "autochthonous",
+      "definition": "Native to the place where it is found; indigenous",
+      "sentence": "The island's autochthonous plants grow nowhere else on earth.",
+      "part_of_speech": "adjective",
+      "language_of_origin": "Greek",
+      "alternate_pronunciations": "aw-TOK-thuh-nus",
+      "difficulty": 5
+    },
+    {
+      "word": "éclaircissement",
+      "definition": "A clarification or explanation of something obscure",
+      "sentence": "The letter offered a long-awaited éclaircissement of the mystery.",
+      "part_of_speech": "noun",
+      "language_of_origin": "French",
+      "alternate_pronunciations": "ay-klair-sees-MAHN",
+      "difficulty": 5
+    }
+  ]
+}

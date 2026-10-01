@@ -30,6 +30,20 @@
             <button id="btn-new-session" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 mb-4">+ New Session</button>
             
             <div id="new-session-form" class="hidden bg-gray-50 p-4 rounded mb-4 border">
+                <div class="flex text-sm mb-3 border-b">
+                    <button id="tab-new-manual" class="px-3 py-1.5 border-b-2 border-blue-600 font-semibold">Fill in</button>
+                    <button id="tab-new-json" class="px-3 py-1.5 border-b-2 border-transparent text-gray-500">From JSON</button>
+                </div>
+                <div id="new-session-json-pane" class="hidden">
+                    <p class="text-xs text-gray-500 mb-2">Paste a full session definition: name, game type, time per word, teams, players and words. Use <b>Copy blank template for AI</b> to have ChatGPT/Claude write one, or start from a file in <code>examples/</code>.</p>
+                    <textarea id="new-session-json" rows="10" class="w-full p-2 border rounded font-mono text-xs mb-2" placeholder='{"name": "Spring Bee", "game_mode": "team", "timer_duration_seconds": 90, "elimination_mode": true, "teams": [...], "players": [...], "words": [...]}'></textarea>
+                    <div class="flex flex-wrap gap-2">
+                        <button id="btn-create-session-json" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Create from JSON</button>
+                        <button id="btn-copy-template" class="bg-indigo-600 text-white px-3 py-2 rounded text-sm">Copy blank template for AI</button>
+                        <button id="btn-cancel-session-json" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
+                    </div>
+                </div>
+                <div id="new-session-manual-pane">
                 <input type="text" id="session-name" placeholder="Session Name" class="w-full p-2 border rounded mb-2">
                 <label class="block text-sm mb-1">Timer Duration (s): <span id="timer-val">120</span></label>
                 <input type="range" id="session-timer" min="30" max="300" value="120" class="w-full mb-2">
@@ -45,6 +59,7 @@
                 <div class="flex space-x-2">
                     <button id="btn-create-session" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Create</button>
                     <button id="btn-cancel-session" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
+                </div>
                 </div>
             </div>
 
@@ -649,13 +664,32 @@
         };
 
         // --- AI Import / Export ---
-        const AI_INSTRUCTIONS = `Below is my spelling bee setup as JSON. Change it however I ask after the JSON, then reply with ONLY the complete JSON in the same format.
-Rules:
-- "game_mode" is "individual" or "team". In a team game, list each player inside their team's "players".
+        const JSON_RULES = `Rules:
+- Session settings: "name"; "game_mode" is "individual" or "team"; "timer_duration_seconds" is the time per word (15-600); "elimination_mode" is true if a miss knocks the speller (or team) out.
+- In a team game, list each player inside their team's "players" (teams have "name" and a hex "color"). In an individual game, put players in the top-level "players".
 - Teams and players are matched by name: keep a name exactly the same to update that entry; a new name adds a new one.
 - Fields you leave out stay unchanged. Nothing is ever deleted, so just leave out anything you don't want to touch.
 - Words: "player_name" gives a word to one player, "team_name" puts it in a team's pool, neither puts it in the shared pool. "difficulty" is 1-5.
 - Player fields: name, age, grade, school, fun_fact. Word fields: word, definition, sentence, part_of_speech, language_of_origin, alternate_pronunciations, difficulty.`;
+        const AI_INSTRUCTIONS = `Below is my spelling bee setup as JSON. Change it however I ask after the JSON, then reply with ONLY the complete JSON in the same format.\n${JSON_RULES}`;
+        const TEMPLATE_INSTRUCTIONS = `Write a complete spelling bee session as JSON in exactly this format, then reply with ONLY the JSON. Fill in real words with accurate definitions, example sentences, part of speech, language of origin and difficulty (1-5).\n${JSON_RULES}`;
+        const BLANK_TEMPLATE = {
+            name: "My Spelling Bee", game_mode: "team", timer_duration_seconds: 90, elimination_mode: true,
+            teams: [{ name: "Team A", color: "#f59e0b", players: [{ name: "Player One", age: "11", grade: "6th", school: "", fun_fact: "" }] }],
+            players: [],
+            words: [
+                { word: "example", definition: "", sentence: "", part_of_speech: "", language_of_origin: "", alternate_pronunciations: "", difficulty: 2, player_name: "Player One" },
+                { word: "example", definition: "", sentence: "", part_of_speech: "", language_of_origin: "", difficulty: 2, team_name: "Team A" },
+                { word: "example", definition: "", sentence: "", part_of_speech: "", language_of_origin: "", difficulty: 3 }
+            ]
+        };
+
+        // AIs often wrap JSON in ```json fences or add a sentence around it; take the outermost {...}
+        function parseLooseJson(raw) {
+            const start = raw.indexOf('{'), end = raw.lastIndexOf('}');
+            return JSON.parse(raw.slice(start, end + 1));
+        }
+        const fmtCounts = (o) => Object.entries(o).map(([k, v]) => `${v} ${k}`).join(', ');
 
         document.getElementById('btn-copy-ai').onclick = async (e) => {
             const data = await api.exportSession(currentSession.id);
@@ -667,16 +701,13 @@ Rules:
         document.getElementById('btn-roster-import').onclick = async () => {
             const resultEl = document.getElementById('roster-result');
             const raw = document.getElementById('roster-json').value;
-            // AIs often wrap JSON in ```json fences or add a sentence around it; take the outermost {...}
-            const start = raw.indexOf('{'), end = raw.lastIndexOf('}');
             let data;
-            try { data = JSON.parse(raw.slice(start, end + 1)); }
+            try { data = parseLooseJson(raw); }
             catch (e) { return alert('Could not find valid JSON: ' + e.message); }
             try {
                 const res = await api.importSession(currentSession.id, data);
-                const fmt = (o) => Object.entries(o).map(([k, v]) => `${v} ${k}`).join(', ');
                 resultEl.className = `mt-3 text-sm p-3 rounded border ${res.warnings.length ? 'bg-amber-50 border-amber-300' : 'bg-green-50 border-green-300'}`;
-                resultEl.innerHTML = `<b>Imported.</b> Created ${fmt(res.created)}. Updated ${fmt(res.updated)}.` +
+                resultEl.innerHTML = `<b>Imported.</b> Created ${fmtCounts(res.created)}. Updated ${fmtCounts(res.updated)}.${res.session_updated ? ' Session settings updated.' : ''}` +
                     (res.warnings.length ? `<ul class="list-disc ml-5 mt-1">${res.warnings.map(w => `<li>${w}</li>`).join('')}</ul>` : '');
                 document.getElementById('roster-json').value = '';
                 toggleForm('roster-import-form', false);
@@ -685,6 +716,36 @@ Rules:
                 resultEl.className = 'mt-3 text-sm p-3 rounded border bg-red-50 border-red-300';
                 resultEl.textContent = 'Import failed: ' + e.message;
             }
+        };
+
+        // --- New session: fill-in form or full JSON definition ---
+        function setNewSessionTab(tab) {
+            const json = tab === 'json';
+            document.getElementById('new-session-json-pane').classList.toggle('hidden', !json);
+            document.getElementById('new-session-manual-pane').classList.toggle('hidden', json);
+            document.getElementById('tab-new-json').className = `px-3 py-1.5 border-b-2 ${json ? 'border-blue-600 font-semibold' : 'border-transparent text-gray-500'}`;
+            document.getElementById('tab-new-manual').className = `px-3 py-1.5 border-b-2 ${!json ? 'border-blue-600 font-semibold' : 'border-transparent text-gray-500'}`;
+        }
+        document.getElementById('tab-new-manual').onclick = () => setNewSessionTab('manual');
+        document.getElementById('tab-new-json').onclick = () => setNewSessionTab('json');
+        document.getElementById('btn-cancel-session-json').onclick = () => toggleForm('new-session-form', false);
+        document.getElementById('btn-copy-template').onclick = (e) =>
+            copyToClipboard(`${TEMPLATE_INSTRUCTIONS}\n\n${JSON.stringify(BLANK_TEMPLATE, null, 2)}\n\nWhat I want: `, e.currentTarget, 'Copied! Paste into your AI');
+
+        document.getElementById('btn-create-session-json').onclick = async () => {
+            let data;
+            try { data = parseLooseJson(document.getElementById('new-session-json').value); }
+            catch (e) { return alert('Could not find valid JSON: ' + e.message); }
+            let res;
+            try { res = await api.createSessionFromJson(data); }
+            catch (e) { return alert('Could not create session: ' + e.message); }
+            document.getElementById('new-session-json').value = '';
+            toggleForm('new-session-form', false);
+            await window.selectSession(res.session_id);
+            const resultEl = document.getElementById('roster-result');
+            resultEl.className = `mt-3 text-sm p-3 rounded border ${res.warnings.length ? 'bg-amber-50 border-amber-300' : 'bg-green-50 border-green-300'}`;
+            resultEl.innerHTML = `<b>Created "${data.name}".</b> Added ${fmtCounts(res.created)}.` +
+                (res.warnings.length ? `<ul class="list-disc ml-5 mt-1">${res.warnings.map(w => `<li>${w}</li>`).join('')}</ul>` : '');
         };
 
         // Init: reopen the last session (or the first one) so players and words are visible right away

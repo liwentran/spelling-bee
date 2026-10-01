@@ -1,0 +1,238 @@
+{
+  "name": "Example: Team Bee (Honeybees vs Bumblebees)",
+  "game_mode": "team",
+  "timer_duration_seconds": 90,
+  "elimination_mode": false,
+  "teams": [
+    {
+      "name": "Honeybees",
+      "color": "#f59e0b",
+      "players": [
+        {
+          "name": "Maya Chen",
+          "age": "11",
+          "grade": "6th",
+          "school": "Lincoln Middle",
+          "fun_fact": "Has read every Percy Jackson book twice"
+        },
+        {
+          "name": "Diego Alvarez",
+          "age": "12",
+          "grade": "7th",
+          "school": "Lincoln Middle",
+          "fun_fact": "Can solve a Rubik's cube in under a minute"
+        },
+        {
+          "name": "Noah Kim",
+          "age": "11",
+          "grade": "6th",
+          "school": "Lincoln Middle",
+          "fun_fact": "Keeps two beehives with his grandpa"
+        }
+      ]
+    },
+    {
+      "name": "Bumblebees",
+      "color": "#3b82f6",
+      "players": [
+        {
+          "name": "Priya Patel",
+          "age": "11",
+          "grade": "6th",
+          "school": "Roosevelt Elementary",
+          "fun_fact": "Plays the violin in the youth orchestra"
+        },
+        {
+          "name": "Sam O'Brien",
+          "age": "12",
+          "grade": "7th",
+          "school": "Roosevelt Elementary",
+          "fun_fact": "Raised a monarch butterfly from a caterpillar"
+        },
+        {
+          "name": "Ella Brooks",
+          "age": "12",
+          "grade": "7th",
+          "school": "Roosevelt Elementary",
+          "fun_fact": "Can name every bird that visits her backyard"
+        }
+      ]
+    }
+  ],
+  "players": [],
+  "words": [
+    {
+      "word": "rhythm",
+      "definition": "A strong, regular repeated pattern of movement or sound",
+      "sentence": "The drummer kept a steady rhythm all night.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "difficulty": 2,
+      "player_name": "Maya Chen"
+    },
+    {
+      "word": "mnemonic",
+      "definition": "A device such as a pattern of letters that helps you remember something",
+      "sentence": "She used a mnemonic to memorize the planets.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "alternate_pronunciations": "nih-MON-ik",
+      "difficulty": 4,
+      "player_name": "Maya Chen"
+    },
+    {
+      "word": "silhouette",
+      "definition": "The dark shape and outline of someone or something against a brighter background",
+      "sentence": "The cat's silhouette appeared in the window.",
+      "part_of_speech": "noun",
+      "language_of_origin": "French",
+      "difficulty": 3,
+      "player_name": "Diego Alvarez"
+    },
+    {
+      "word": "onomatopoeia",
+      "definition": "The formation of a word from a sound associated with what is named",
+      "sentence": "\"Buzz\" is a classic example of onomatopoeia.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "difficulty": 5,
+      "player_name": "Diego Alvarez"
+    },
+    {
+      "word": "propolis",
+      "definition": "A sticky resin that bees collect from tree buds and use to seal their hives",
+      "sentence": "The bees sealed every crack in the hive with propolis.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "alternate_pronunciations": "PROP-uh-lis",
+      "difficulty": 3,
+      "player_name": "Noah Kim"
+    },
+    {
+      "word": "larvae",
+      "definition": "The young, wormlike form of many insects after hatching (plural of larva)",
+      "sentence": "Worker bees feed the larvae royal jelly.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Latin",
+      "alternate_pronunciations": "LAR-vee",
+      "difficulty": 3,
+      "player_name": "Noah Kim"
+    },
+    {
+      "word": "apiary",
+      "definition": "A place where bees are kept; a collection of beehives",
+      "sentence": "The farm's apiary held twenty hives.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Latin",
+      "difficulty": 3,
+      "team_name": "Honeybees"
+    },
+    {
+      "word": "nectar",
+      "definition": "A sugary fluid produced by flowers to attract pollinators",
+      "sentence": "Bees collect nectar to make honey.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "difficulty": 1,
+      "team_name": "Honeybees"
+    },
+    {
+      "word": "pharaoh",
+      "definition": "A ruler in ancient Egypt",
+      "sentence": "The pharaoh's tomb was filled with treasure.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Egyptian",
+      "difficulty": 3,
+      "player_name": "Priya Patel"
+    },
+    {
+      "word": "bureaucracy",
+      "definition": "A system of government with many complicated rules and processes",
+      "sentence": "The new permit got stuck in the bureaucracy.",
+      "part_of_speech": "noun",
+      "language_of_origin": "French",
+      "difficulty": 4,
+      "player_name": "Priya Patel"
+    },
+    {
+      "word": "conscience",
+      "definition": "An inner feeling or voice viewed as a guide to right or wrong behavior",
+      "sentence": "His conscience told him to return the wallet.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Latin",
+      "difficulty": 3,
+      "player_name": "Sam O'Brien"
+    },
+    {
+      "word": "chrysanthemum",
+      "definition": "A plant of the daisy family with brightly colored flowers",
+      "sentence": "Grandma grew a chrysanthemum by the porch.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "difficulty": 5,
+      "player_name": "Sam O'Brien"
+    },
+    {
+      "word": "ornithology",
+      "definition": "The scientific study of birds",
+      "sentence": "Her love of ornithology started with a backyard feeder.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "difficulty": 4,
+      "player_name": "Ella Brooks"
+    },
+    {
+      "word": "symbiosis",
+      "definition": "A close relationship between two different species that benefits both",
+      "sentence": "Bees and flowers live in symbiosis.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "difficulty": 4,
+      "player_name": "Ella Brooks"
+    },
+    {
+      "word": "pollinate",
+      "definition": "To carry pollen to a flower so it can produce seeds",
+      "sentence": "Bumblebees pollinate tomato plants.",
+      "part_of_speech": "verb",
+      "language_of_origin": "Latin",
+      "difficulty": 2,
+      "team_name": "Bumblebees"
+    },
+    {
+      "word": "colony",
+      "definition": "A community of animals or plants of one kind living close together",
+      "sentence": "The colony had thousands of worker bees.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Latin",
+      "difficulty": 1,
+      "team_name": "Bumblebees"
+    },
+    {
+      "word": "pneumonia",
+      "definition": "Lung inflammation caused by a bacterial or viral infection",
+      "sentence": "He missed a week of school with pneumonia.",
+      "part_of_speech": "noun",
+      "language_of_origin": "Greek",
+      "alternate_pronunciations": "noo-MOHN-yuh",
+      "difficulty": 4
+    },
+    {
+      "word": "entrepreneur",
+      "definition": "A person who sets up a business, taking on financial risks",
+      "sentence": "The young entrepreneur sold lemonade and honey.",
+      "part_of_speech": "noun",
+      "language_of_origin": "French",
+      "alternate_pronunciations": "ahn-truh-pruh-NUR",
+      "difficulty": 4
+    },
+    {
+      "word": "weird",
+      "definition": "Suggesting something supernatural; unusual or strange",
+      "sentence": "There was a weird noise coming from the hive.",
+      "part_of_speech": "adjective",
+      "language_of_origin": "Old English",
+      "difficulty": 2
+    }
+  ]
+}
