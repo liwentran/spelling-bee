@@ -48,6 +48,25 @@
 
         <!-- Players & Words Panels -->
         <div class="col-span-1 md:col-span-2 space-y-6 hidden" id="session-details">
+            <!-- Active Session Quick Links Bar -->
+            <div class="bg-white p-4 rounded-lg shadow flex flex-wrap items-center justify-between gap-3 border-l-4 border-yellow-500">
+                <div>
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active Session</span>
+                    <h2 id="active-session-title" class="text-lg font-bold text-gray-800"></h2>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button id="btn-copy-display" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition shadow-sm">
+                        <span>📺 Copy Display Link (TV)</span>
+                    </button>
+                    <a id="btn-open-display" href="#" target="_blank" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1.5 rounded text-sm font-medium transition" title="Open Display in new tab">
+                        ↗
+                    </a>
+                    <button id="btn-copy-control" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition shadow-sm">
+                        <span>📱 Copy Controller Link</span>
+                    </button>
+                </div>
+            </div>
+
             <!-- Players -->
             <div class="bg-white p-6 rounded-lg shadow">
                 <div class="flex justify-between items-center mb-4">
@@ -169,7 +188,10 @@
                             <div class="font-bold">${s.name}</div>
                             <div class="text-xs text-gray-500">Players: ${s.players_count ?? (s.players?.length || 0)} | Words: ${s.words_count ?? (s.words?.length || 0)}</div>
                         </div>
-                        <div class="flex space-x-2">
+                        <div class="flex items-center space-x-1.5">
+                            <button onclick="event.stopPropagation(); window.copyDisplayUrl('${s.id}', this)" class="text-xs text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded font-medium flex items-center gap-1" title="Copy Display URL for TV">
+                                📺 Copy Link
+                            </button>
                             <button onclick="event.stopPropagation(); window.resetSess('${s.id}')" class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">Reset</button>
                             <button onclick="event.stopPropagation(); window.deleteSess('${s.id}')" class="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">Del</button>
                         </div>
@@ -178,9 +200,53 @@
             } catch (e) { console.error(e); }
         }
 
+        function getDisplayUrl(sessionId) {
+            return `${window.location.origin}/static/display.html?session=${sessionId}`;
+        }
+
+        function getControlUrl(sessionId) {
+            return `${window.location.origin}/static/control.html?session=${sessionId}`;
+        }
+
+        async function copyToClipboard(text, btnElement, successMsg = 'Copied!') {
+            try {
+                await navigator.clipboard.writeText(text);
+                const originalHtml = btnElement.innerHTML;
+                btnElement.innerHTML = `<span>✓ ${successMsg}</span>`;
+                btnElement.classList.add('bg-green-600', 'text-white');
+                setTimeout(() => {
+                    btnElement.innerHTML = originalHtml;
+                    btnElement.classList.remove('bg-green-600', 'text-white');
+                }, 1800);
+            } catch (err) {
+                // Fallback for older browsers / unsecured contexts
+                const tempInput = document.createElement('input');
+                tempInput.value = text;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                alert(`Copied: ${text}`);
+            }
+        }
+
+        window.copyDisplayUrl = (sessionId, btnElement) => {
+            copyToClipboard(getDisplayUrl(sessionId), btnElement, 'Copied Display URL!');
+        };
+
         window.selectSession = async (id) => {
             currentSession = await api.getSession(id);
             dom.sessionDetails.classList.remove('hidden');
+            document.getElementById('active-session-title').textContent = currentSession.name;
+            
+            const btnCopyDisp = document.getElementById('btn-copy-display');
+            const btnOpenDisp = document.getElementById('btn-open-display');
+            const btnCopyCtrl = document.getElementById('btn-copy-control');
+            
+            btnCopyDisp.onclick = () => copyToClipboard(getDisplayUrl(id), btnCopyDisp, 'Copied!');
+            btnOpenDisp.href = getDisplayUrl(id);
+            btnCopyCtrl.onclick = () => copyToClipboard(getControlUrl(id), btnCopyCtrl, 'Copied!');
+
             loadSessions(); // to update active state
             await loadSessionData();
         };
