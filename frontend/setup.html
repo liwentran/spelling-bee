@@ -167,7 +167,7 @@
                     <div class="p-3 border rounded cursor-pointer hover:bg-blue-50 flex justify-between items-center ${currentSession?.id === s.id ? 'bg-blue-100 border-blue-400' : ''}" onclick="window.selectSession('${s.id}')">
                         <div>
                             <div class="font-bold">${s.name}</div>
-                            <div class="text-xs text-gray-500">Players: ${s.players?.length || 0} | Words: ${s.words?.length || 0}</div>
+                            <div class="text-xs text-gray-500">Players: ${s.players_count ?? (s.players?.length || 0)} | Words: ${s.words_count ?? (s.words?.length || 0)}</div>
                         </div>
                         <div class="flex space-x-2">
                             <button onclick="event.stopPropagation(); window.resetSess('${s.id}')" class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">Reset</button>

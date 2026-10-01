@@ -36,7 +36,15 @@ def create_session(session_data: SessionCreate, db: DbSession = Depends(get_sess
 @router.get("")
 def list_sessions(db: DbSession = Depends(get_session)):
     sessions = db.exec(select(Session)).all()
-    return sessions
+    return [
+        {
+            **s.dict(),
+            "players_count": len(s.players),
+            "words_count": len(s.words),
+            "turns_count": len(s.turns)
+        }
+        for s in sessions
+    ]
 
 @router.get("/{session_id}")
 def get_session_details(session_id: str, db: DbSession = Depends(get_session)):
