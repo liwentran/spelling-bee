@@ -3,6 +3,7 @@ let reconnectTimer = null;
 let currentSessionId = null;
 let stateCallback = null;
 let soundCallback = null;
+let pronounceCallback = null;
 
 export function connect(sessionId) {
     if (ws) ws.close();
@@ -22,6 +23,8 @@ export function connect(sessionId) {
                 stateCallback(data);
             } else if (data.type === 'PLAY_SOUND' && soundCallback) {
                 soundCallback(data.sound);
+            } else if (data.type === 'PRONOUNCE_WORD' && pronounceCallback) {
+                pronounceCallback(data);
             }
         } catch (e) {
             console.error('Error parsing WS message:', e);
@@ -56,6 +59,10 @@ export function onSound(callback) {
     soundCallback = callback;
 }
 
+export function onPronounce(callback) {
+    pronounceCallback = callback;
+}
+
 export function send(command) {
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(command));
@@ -86,3 +93,4 @@ export const showScoreboard = () => send({ type: 'SHOW_SCOREBOARD' });
 export const showPlayerIntro = () => send({ type: 'SHOW_PLAYER_INTRO' });
 export const nextRound = () => send({ type: 'NEXT_ROUND' });
 export const playSound = (sound) => send({ type: 'PLAY_SOUND', sound });
+export const pronounceWord = (rate) => send({ type: 'PRONOUNCE_WORD', rate });

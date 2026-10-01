@@ -3,12 +3,14 @@ from sqlmodel import Session as DbSession, select
 from typing import List, Optional
 from pydantic import BaseModel
 from database import get_session
-from models import Word, Session, Player
+from models import Word, Session, Player, Team
+from routes.teams import validate_team
 
 router = APIRouter(prefix="/api/sessions/{session_id}/words", tags=["words"])
 
 class WordCreate(BaseModel):
     player_id: Optional[str] = None
+    team_id: Optional[str] = None
     word: str
     definition: Optional[str] = None
     sentence: Optional[str] = None
@@ -19,6 +21,7 @@ class WordCreate(BaseModel):
 
 class WordUpdate(BaseModel):
     player_id: Optional[str] = None
+    team_id: Optional[str] = None
     word: Optional[str] = None
     definition: Optional[str] = None
     sentence: Optional[str] = None
@@ -30,6 +33,7 @@ class WordUpdate(BaseModel):
 
 class BulkWordImport(BaseModel):
     player_name: Optional[str] = None
+    team_name: Optional[str] = None
     word: str
     definition: Optional[str] = None
     sentence: Optional[str] = None
@@ -44,6 +48,7 @@ def create_word(session_id: str, word_data: WordCreate, db: DbSession = Depends(
     session = db.get(Session, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    validate_team(db, session_id, word_data.team_id)
         
     word = Word(
         session_id=session_id,
@@ -64,16 +69,22 @@ def bulk_import_words(session_id: str, words_data: List[BulkWordImport], db: DbS
     statement = select(Player).where(Player.session_id == session_id)
     players = db.exec(statement).all()
     player_map = {p.name.lower(): p.id for p in players}
+    teams = db.exec(select(Team).where(Team.session_id == session_id)).all()
+    team_map = {t.name.lower(): t.id for t in teams}
     
     created_words = []
     for wd in words_data:
         player_id = None
         if wd.player_name and wd.player_name.lower() in player_map:
             player_id = player_map[wd.player_name.lower()]
+        team_id = None
+        if wd.team_name and wd.team_name.lower() in team_map:
+            team_id = team_map[wd.team_name.lower()]
             
         word = Word(
             session_id=session_id,
             player_id=player_id,
+            team_id=team_id,
             word=wd.word,
             definition=wd.definition,
             sentence=wd.sentence,
@@ -93,6 +104,7 @@ def bulk_import_words(session_id: str, words_data: List[BulkWordImport], db: DbS
 def list_words(
     session_id: str, 
     player_id: Optional[str] = None, 
+    team_id: Optional[str] = None,
     used: Optional[bool] = None,
     sort_by: Optional[str] = Query(None, description="Field to sort by"),
     db: DbSession = Depends(get_session)
@@ -100,6 +112,8 @@ def list_words(
     statement = select(Word).where(Word.session_id == session_id)
     if player_id is not None:
         statement = statement.where(Word.player_id == player_id)
+    if team_id is not None:
+        statement = statement.where(Word.team_id == team_id)
     if used is not None:
         statement = statement.where(Word.used == used)
         
@@ -123,6 +137,8 @@ def update_word(session_id: str, word_id: str, word_data: WordUpdate, db: DbSess
         raise HTTPException(status_code=404, detail="Word not found")
         
     update_data = word_data.dict(exclude_unset=True)
+    if "team_id" in update_data:
+        validate_team(db, session_id, update_data["team_id"])
     for key, value in update_data.items():
         setattr(word, key, value)
         

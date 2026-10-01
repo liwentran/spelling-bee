@@ -67,6 +67,23 @@
                 </div>
             </div>
 
+            <!-- Teams -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Teams <span class="text-sm font-normal text-gray-400">(optional)</span></h2>
+                    <button id="btn-add-team" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">+ Add Team</button>
+                </div>
+
+                <div id="new-team-form" class="hidden bg-gray-50 p-4 rounded mb-4 border flex gap-2 items-center">
+                    <input type="text" id="team-name" placeholder="Team Name (Required)" class="flex-1 p-2 border rounded">
+                    <input type="color" id="team-color" value="#f59e0b" class="w-12 h-10 border rounded cursor-pointer" title="Team color">
+                    <button id="btn-save-team" class="bg-green-600 text-white px-4 py-2 rounded text-sm">Save</button>
+                    <button id="btn-cancel-team" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
+                </div>
+
+                <div id="team-list" class="flex flex-wrap gap-2"></div>
+            </div>
+
             <!-- Players -->
             <div class="bg-white p-6 rounded-lg shadow">
                 <div class="flex justify-between items-center mb-4">
@@ -80,6 +97,9 @@
                     <input type="text" id="player-grade" placeholder="Grade" class="p-2 border rounded">
                     <input type="text" id="player-school" placeholder="School" class="col-span-2 p-2 border rounded">
                     <input type="text" id="player-fun-fact" placeholder="Fun Fact" class="col-span-2 p-2 border rounded">
+                    <select id="player-team" class="col-span-2 p-2 border rounded">
+                        <option value="">-- No Team --</option>
+                    </select>
                     <div class="col-span-2 flex space-x-2 mt-2">
                         <button id="btn-save-player" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Save</button>
                         <button id="btn-cancel-player" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
@@ -101,7 +121,7 @@
 
                 <!-- Bulk Import Modal inline -->
                 <div id="import-words-form" class="hidden bg-gray-50 p-4 rounded mb-4 border">
-                    <p class="text-sm mb-2 text-gray-600">Paste JSON array of words. E.g.: <code>[{"word": "apple", "definition": "fruit", "difficulty": 1, "player_name": "Alice"}]</code></p>
+                    <p class="text-sm mb-2 text-gray-600">Paste JSON array of words. E.g.: <code>[{"word": "apple", "definition": "fruit", "difficulty": 1, "player_name": "Alice"}]</code>. Use <code>"team_name"</code> instead of <code>"player_name"</code> to add a word to a team's pool.</p>
                     <textarea id="import-json" rows="5" class="w-full p-2 border rounded font-mono text-sm mb-2"></textarea>
                     <div class="flex space-x-2">
                         <button id="btn-save-import" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Import</button>
@@ -125,7 +145,7 @@
                         <option value="5">Difficulty 5</option>
                     </select>
                     <select id="word-player" class="p-2 border rounded">
-                        <option value="">-- Pool (No Player) --</option>
+                        <option value="">-- Session Pool --</option>
                     </select>
                     <div class="col-span-2 flex space-x-2 mt-2">
                         <button id="btn-save-word" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Save</button>
@@ -148,6 +168,7 @@
         import * as api from './js/api.js';
 
         let currentSession = null;
+        let teams = [];
         let players = [];
         let words = [];
         let activeTab = 'all';
@@ -155,6 +176,8 @@
         const dom = {
             sessionList: document.getElementById('session-list'),
             sessionDetails: document.getElementById('session-details'),
+            teamList: document.getElementById('team-list'),
+            playerTeamSelect: document.getElementById('player-team'),
             playerList: document.getElementById('player-list'),
             wordList: document.getElementById('word-list'),
             wordPlayerSelect: document.getElementById('word-player'),
@@ -172,6 +195,14 @@
         
         document.getElementById('btn-new-session').onclick = () => toggleForm('new-session-form', true);
         document.getElementById('btn-cancel-session').onclick = () => toggleForm('new-session-form', false);
+        const TEAM_COLORS = ['#f59e0b', '#3b82f6', '#ef4444', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+        document.getElementById('btn-add-team').onclick = () => {
+            // Pre-pick a color no existing team uses
+            const used = new Set(teams.map(t => (t.color || '').toLowerCase()));
+            document.getElementById('team-color').value = TEAM_COLORS.find(c => !used.has(c)) || TEAM_COLORS[teams.length % TEAM_COLORS.length];
+            toggleForm('new-team-form', true);
+        };
+        document.getElementById('btn-cancel-team').onclick = () => toggleForm('new-team-form', false);
         document.getElementById('btn-add-player').onclick = () => toggleForm('new-player-form', true);
         document.getElementById('btn-cancel-player').onclick = () => toggleForm('new-player-form', false);
         document.getElementById('btn-add-word').onclick = () => toggleForm('new-word-form', true);
@@ -283,25 +314,81 @@
 
         async function loadSessionData() {
             if (!currentSession) return;
+            teams = await api.fetchTeams(currentSession.id);
             players = await api.fetchPlayers(currentSession.id);
             words = await api.fetchWords(currentSession.id);
+            if (activeTab.startsWith('team:') && !teams.some(t => `team:${t.id}` === activeTab)) activeTab = 'all';
+            renderTeams();
             renderPlayers();
             renderWordTabs();
             renderWords();
             updatePlayerDropdown();
         }
 
+        // Team colors are user-entered; only allow hex values into style attributes
+        const teamColor = (c) => /^#[0-9a-f]{3,8}$/i.test(c || '') ? c : '#eab308';
+        const teamOptions = (selectedId) => teams.map(t =>
+            `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${t.name}</option>`).join('');
+
+        function renderTeams() {
+            dom.teamList.innerHTML = teams.length === 0
+                ? '<div class="text-sm text-gray-400">No teams — players compete individually.</div>'
+                : teams.map(t => {
+                    const count = players.filter(p => p.team_id === t.id).length;
+                    return `
+                    <div class="flex items-center gap-2 border rounded-full pl-2 pr-3 py-1 bg-white shadow-sm">
+                        <input type="color" value="${teamColor(t.color)}" onchange="window.setTeamColor('${t.id}', this.value)" class="w-6 h-6 rounded-full cursor-pointer border-0 p-0" title="Change color">
+                        <span class="font-semibold">${t.name}</span>
+                        <span class="text-xs text-gray-400">${count} player${count === 1 ? '' : 's'}</span>
+                        <button onclick="window.deleteTeam('${t.id}')" class="text-red-400 hover:text-red-600 text-sm ml-1" title="Delete team">✕</button>
+                    </div>`;
+                }).join('');
+            dom.playerTeamSelect.innerHTML = '<option value="">-- No Team --</option>' + teamOptions();
+        }
+
+        window.setTeamColor = async (id, color) => {
+            await api.updateTeam(currentSession.id, id, { color });
+            loadSessionData();
+        };
+
+        window.deleteTeam = async (id) => {
+            if (confirm('Delete team? Its players and words will be unassigned, not deleted.')) {
+                await api.deleteTeam(currentSession.id, id);
+                loadSessionData();
+            }
+        };
+
+        document.getElementById('btn-save-team').onclick = async () => {
+            const name = document.getElementById('team-name').value.trim();
+            if (!name) return alert('Name required');
+            await api.createTeam(currentSession.id, { name, color: document.getElementById('team-color').value });
+            document.getElementById('team-name').value = '';
+            toggleForm('new-team-form', false);
+            loadSessionData();
+        };
+
         function renderPlayers() {
-            dom.playerList.innerHTML = players.map(p => `
-                <div class="p-3 border rounded bg-white shadow-sm flex justify-between items-center">
-                    <div>
+            dom.playerList.innerHTML = players.map(p => {
+                const team = teams.find(t => t.id === p.team_id);
+                return `
+                <div class="p-3 border rounded bg-white shadow-sm flex justify-between items-center gap-3" ${team ? `style="border-left: 4px solid ${teamColor(team.color)}"` : ''}>
+                    <div class="flex-1">
                         <div class="font-bold">${p.name} ${p.eliminated ? '<span class="text-red-500 text-xs">(Eliminated)</span>' : ''}</div>
                         <div class="text-xs text-gray-500">${p.grade || ''} ${p.school ? '- ' + p.school : ''}</div>
                     </div>
+                    ${teams.length ? `
+                    <select onchange="window.setPlayerTeam('${p.id}', this.value)" class="text-sm p-1 border rounded">
+                        <option value="">No Team</option>${teamOptions(p.team_id)}
+                    </select>` : ''}
                     <button onclick="window.deletePlayer('${p.id}')" class="text-red-500 hover:text-red-700">Delete</button>
                 </div>
-            `).join('');
+            `}).join('');
         }
+
+        window.setPlayerTeam = async (playerId, teamId) => {
+            await api.updatePlayer(currentSession.id, playerId, { team_id: teamId || null });
+            loadSessionData();
+        };
 
         window.deletePlayer = async (id) => {
             if(confirm('Delete player?')) {
@@ -318,22 +405,43 @@
                 age: document.getElementById('player-age').value || null,
                 grade: document.getElementById('player-grade').value,
                 school: document.getElementById('player-school').value,
-                fun_fact: document.getElementById('player-fun-fact').value
+                fun_fact: document.getElementById('player-fun-fact').value,
+                team_id: dom.playerTeamSelect.value || null
             });
             toggleForm('new-player-form', false);
             loadSessionData();
         };
 
+        // Words belong to the session pool, a team's pool, or a single player
+        const assignmentValue = (w) => w.player_id ? `player:${w.player_id}` : w.team_id ? `team:${w.team_id}` : '';
+        const parseAssignment = (value) => ({
+            player_id: value.startsWith('player:') ? value.slice(7) : null,
+            team_id: value.startsWith('team:') ? value.slice(5) : null,
+        });
+        const assignmentOptions = (selected = '') => {
+            const opt = (value, label) => `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`;
+            let html = opt('', '-- Session Pool --');
+            if (teams.length) html += `<optgroup label="Team Pools">${teams.map(t => opt(`team:${t.id}`, t.name)).join('')}</optgroup>`;
+            if (players.length) html += `<optgroup label="Players">${players.map(p => opt(`player:${p.id}`, p.name)).join('')}</optgroup>`;
+            return html;
+        };
+
         function updatePlayerDropdown() {
-            dom.wordPlayerSelect.innerHTML = `<option value="">-- Pool (No Player) --</option>` + 
-                players.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            dom.wordPlayerSelect.innerHTML = assignmentOptions();
         }
+
+        window.setWordAssignment = async (wordId, value) => {
+            await api.updateWord(currentSession.id, wordId, parseAssignment(value));
+            loadSessionData();
+        };
 
         function renderWordTabs() {
             dom.wordTabs.innerHTML = `
                 <button class="px-4 py-2 border-b-2 ${activeTab === 'all' ? 'border-blue-600 font-semibold' : 'text-gray-500 border-transparent'} hover:text-gray-700 whitespace-nowrap" onclick="window.setTab('all')">All Words</button>
                 <button class="px-4 py-2 border-b-2 ${activeTab === 'pool' ? 'border-blue-600 font-semibold' : 'text-gray-500 border-transparent'} hover:text-gray-700 whitespace-nowrap" onclick="window.setTab('pool')">Session Pool</button>
-            ` + players.map(p => `
+            ` + teams.map(t => `
+                <button class="px-4 py-2 border-b-2 ${activeTab === `team:${t.id}` ? 'border-blue-600 font-semibold' : 'text-gray-500 border-transparent'} hover:text-gray-700 whitespace-nowrap" onclick="window.setTab('team:${t.id}')"><span class="inline-block w-2 h-2 rounded-full mr-1" style="background-color: ${teamColor(t.color)}"></span>${t.name}</button>
+            `).join('') + players.map(p => `
                 <button class="px-4 py-2 border-b-2 ${activeTab === p.id ? 'border-blue-600 font-semibold' : 'text-gray-500 border-transparent'} hover:text-gray-700 whitespace-nowrap" onclick="window.setTab('${p.id}')">${p.name}</button>
             `).join('');
         }
@@ -347,12 +455,12 @@
         function renderWords() {
             const filtered = words.filter(w => {
                 if (activeTab === 'all') return true;
-                if (activeTab === 'pool') return !w.player_id;
+                if (activeTab === 'pool') return !w.player_id && !w.team_id;
+                if (activeTab.startsWith('team:')) return !w.player_id && w.team_id === activeTab.slice(5);
                 return w.player_id === activeTab;
             });
 
             dom.wordList.innerHTML = filtered.map(w => {
-                const p = players.find(pl => pl.id === w.player_id);
                 return `
                 <div class="p-3 border rounded bg-white shadow-sm flex justify-between items-center ${w.used ? 'opacity-50' : ''}">
                     <div>
@@ -362,9 +470,11 @@
                             ${w.used ? '<span class="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded">Used</span>' : ''}
                         </div>
                         <div class="text-xs text-gray-500 truncate max-w-md">${w.definition || 'No definition'}</div>
-                        <div class="text-xs font-semibold text-blue-600 mt-1">${p ? p.name : 'Pool'}</div>
                     </div>
-                    <button onclick="window.deleteWord('${w.id}')" class="text-red-500 hover:text-red-700">Del</button>
+                    <div class="flex items-center gap-3">
+                        <select onchange="window.setWordAssignment('${w.id}', this.value)" class="text-sm p-1 border rounded max-w-[160px]">${assignmentOptions(assignmentValue(w))}</select>
+                        <button onclick="window.deleteWord('${w.id}')" class="text-red-500 hover:text-red-700">Del</button>
+                    </div>
                 </div>
             `}).join('');
         }
@@ -387,7 +497,7 @@
                 language_of_origin: document.getElementById('word-origin').value,
                 alternate_pronunciations: document.getElementById('word-alt').value,
                 difficulty: parseInt(document.getElementById('word-difficulty').value),
-                player_id: document.getElementById('word-player').value || null
+                ...parseAssignment(dom.wordPlayerSelect.value)
             });
             toggleForm('new-word-form', false);
             loadSessionData();

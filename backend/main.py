@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 from engine import run_migrations
 
-from routes import sessions, players, words, turns, ws
+from routes import sessions, teams, players, words, turns, ws
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,7 +31,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def no_cache_static(request, call_next):
+    # No build step / versioned filenames, so make browsers revalidate (ETag keeps it cheap).
+    # Otherwise a stale cached js/api.js can break a freshly loaded page.
+    response = await call_next(request)
+    if request.url.path.startswith("/static"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
 app.include_router(sessions.router)
+app.include_router(teams.router)
 app.include_router(players.router)
 app.include_router(words.router)
 app.include_router(turns.router)

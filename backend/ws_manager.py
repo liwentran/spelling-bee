@@ -37,6 +37,12 @@ class GameState:
         }
 
 
+def _team_dict(team) -> Optional[dict]:
+    if not team:
+        return None
+    return {"id": team.id, "name": team.name, "color": team.color}
+
+
 def _fetch_player(player_id: str) -> Optional[dict]:
     """Fetch player details from DB."""
     from models import Player
@@ -54,6 +60,8 @@ def _fetch_player(player_id: str) -> Optional[dict]:
                 "eliminated": player.eliminated,
                 "elimination_round": player.elimination_round,
                 "sort_order": player.sort_order,
+                "team_id": player.team_id,
+                "team": _team_dict(player.team),
             }
     return None
 
@@ -76,18 +84,23 @@ def _fetch_word(word_id: str) -> Optional[dict]:
                 "difficulty": word.difficulty,
                 "used": word.used,
                 "player_id": word.player_id,
+                "team_id": word.team_id,
+                "team": _team_dict(word.team),
             }
     return None
 
 
-def _fetch_scoreboard(session_id: str) -> list:
-    """Fetch scoreboard data from DB."""
-    from models import Player, Turn, Session as SessionModel
+def _fetch_scoreboard(session_id: str) -> tuple[list, list]:
+    """Fetch per-player and per-team scoreboard data from DB."""
+    from models import Player, Team, Turn, Session as SessionModel
     engine = get_engine()
     with SQLSession(engine) as session:
         sess = session.get(SessionModel, session_id)
         if not sess:
-            return []
+            return [], []
+
+        teams = session.exec(select(Team).where(Team.session_id == session_id).order_by(Team.sort_order)).all()
+        team_map = {t.id: t for t in teams}
 
         players = session.exec(select(Player).where(Player.session_id == session_id).order_by(Player.sort_order)).all()
         turns = session.exec(select(Turn).where(Turn.session_id == session_id)).all()
@@ -100,16 +113,34 @@ def _fetch_scoreboard(session_id: str) -> list:
             timeout = sum(1 for t in player_turns if t.result == "timeout")
             rounds_survived = player.elimination_round - 1 if player.elimination_round else sess.current_round
 
+            team = team_map.get(player.team_id)
             scoreboard.append({
                 "player_id": player.id,
                 "player_name": player.name,
+                "team_id": player.team_id,
+                "team_name": team.name if team else None,
+                "team_color": team.color if team else None,
                 "eliminated": player.eliminated,
                 "total_correct": correct,
                 "total_incorrect": incorrect,
                 "total_timeout": timeout,
                 "rounds_survived": rounds_survived,
             })
-        return scoreboard
+
+        team_scoreboard = []
+        for team in teams:
+            members = [p for p in scoreboard if p["team_id"] == team.id]
+            team_scoreboard.append({
+                "team_id": team.id,
+                "team_name": team.name,
+                "team_color": team.color,
+                "players_count": len(members),
+                "active_count": sum(1 for p in members if not p["eliminated"]),
+                "total_correct": sum(p["total_correct"] for p in members),
+                "total_attempts": sum(p["total_correct"] + p["total_incorrect"] + p["total_timeout"] for p in members),
+            })
+        team_scoreboard.sort(key=lambda t: t["total_correct"], reverse=True)
+        return scoreboard, team_scoreboard
 
 
 class ConnectionManager:
@@ -233,12 +264,22 @@ class ConnectionManager:
             await self.broadcast(session_id, {"type": "PLAY_SOUND", "sound": command.get("sound")})
             return  # Don't send state update for sound-only
 
+        elif cmd_type == "PRONOUNCE_WORD":
+            # Display speaks the current word via Web Speech API; no state change
+            if state.word_details:
+                await self.broadcast(session_id, {
+                    "type": "PRONOUNCE_WORD",
+                    "word": state.word_details["word"],
+                    "rate": command.get("rate", 0.8),
+                })
+            return
+
         # Build broadcast payload
         payload = {"type": "STATE_UPDATE", "state": state.to_dict()}
 
         # Include scoreboard data when in scoreboard mode
         if state.display_mode == "scoreboard":
-            payload["scoreboard"] = _fetch_scoreboard(session_id)
+            payload["scoreboard"], payload["team_scoreboard"] = _fetch_scoreboard(session_id)
 
         await self.broadcast(session_id, payload)
 

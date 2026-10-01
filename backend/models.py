@@ -14,14 +14,30 @@ class Session(SQLModel, table=True):
     current_round: int = Field(default=1)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
+    teams: List["Team"] = Relationship(back_populates="session", cascade_delete=True)
     players: List["Player"] = Relationship(back_populates="session", cascade_delete=True)
     words: List["Word"] = Relationship(back_populates="session", cascade_delete=True)
     turns: List["Turn"] = Relationship(back_populates="session", cascade_delete=True)
+
+class Team(SQLModel, table=True):
+    __tablename__ = "teams"
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    session_id: str = Field(foreign_key="sessions.id")
+    name: str
+    color: Optional[str] = None  # hex, e.g. #f59e0b
+    sort_order: int = Field(default=0)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    session: Optional[Session] = Relationship(back_populates="teams")
+    # No delete cascade: deleting a team unassigns its players/words (team_id -> NULL)
+    players: List["Player"] = Relationship(back_populates="team")
+    words: List["Word"] = Relationship(back_populates="team")
 
 class Player(SQLModel, table=True):
     __tablename__ = "players"
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     session_id: str = Field(foreign_key="sessions.id")
+    team_id: Optional[str] = Field(default=None, foreign_key="teams.id")
     name: str
     age: Optional[str] = None
     grade: Optional[str] = None
@@ -33,6 +49,7 @@ class Player(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     session: Optional[Session] = Relationship(back_populates="players")
+    team: Optional[Team] = Relationship(back_populates="players")
     words: List["Word"] = Relationship(back_populates="player", cascade_delete=True)
     turns: List["Turn"] = Relationship(back_populates="player", cascade_delete=True)
 
@@ -41,6 +58,7 @@ class Word(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     session_id: str = Field(foreign_key="sessions.id")
     player_id: Optional[str] = Field(default=None, foreign_key="players.id")  # null = session pool
+    team_id: Optional[str] = Field(default=None, foreign_key="teams.id")  # set with no player = team pool
     word: str
     definition: Optional[str] = None
     sentence: Optional[str] = None
@@ -53,6 +71,7 @@ class Word(SQLModel, table=True):
     
     session: Optional[Session] = Relationship(back_populates="words")
     player: Optional[Player] = Relationship(back_populates="words")
+    team: Optional[Team] = Relationship(back_populates="words")
     turns: List["Turn"] = Relationship(back_populates="word", cascade_delete=True)
 
 class Turn(SQLModel, table=True):

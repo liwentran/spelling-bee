@@ -48,6 +48,7 @@
         <!-- Player Intro View -->
         <div id="view-player-intro" class="hidden text-center w-full slide-up">
             <div class="text-yellow-500 text-3xl mb-4 tracking-widest uppercase">Up Next</div>
+            <div id="intro-team" class="hidden inline-block text-2xl font-bold px-6 py-2 rounded-full mb-6 border-2 tracking-wide"></div>
             <h1 id="intro-name" class="text-9xl font-serif glow font-black mb-8 text-white"></h1>
             <div class="flex justify-center space-x-8 text-3xl opacity-80 mb-8">
                 <span id="intro-age"></span>
@@ -83,6 +84,7 @@
         <!-- Scoreboard Mode -->
         <div id="view-scoreboard" class="hidden w-full fade-in flex flex-col items-center pt-12">
             <h1 class="text-6xl font-serif glow font-black mb-12">Scoreboard</h1>
+            <div id="team-scoreboard" class="hidden w-full max-w-5xl grid gap-4 mb-8"></div>
             <div class="w-full max-w-5xl bg-gray-900/50 rounded-2xl p-8 border border-gray-700">
                 <div class="grid grid-cols-4 gap-4 text-2xl font-bold text-gray-400 mb-6 border-b border-gray-700 pb-4">
                     <div class="col-span-2">Player</div>
@@ -139,11 +141,14 @@
         dom.clickToStart.onclick = async () => {
             dom.clickToStart.classList.add('hidden');
             sounds.initAudio();
+            // Speech synthesis needs a user gesture before it will play; prime it here
+            if ('speechSynthesis' in window) window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
 
             if (sessionId) {
                 ws.connect(sessionId);
                 ws.onStateUpdate(handleStateUpdate);
                 ws.onSound(handleSound);
+                ws.onPronounce(handlePronounce);
                 try {
                     const sess = await api.getSession(sessionId);
                     document.getElementById('idle-session-name').textContent = sess.name;
@@ -163,6 +168,45 @@
                 case 'countdown': sounds.playCountdown(); break;
             }
         }
+
+        function speak(text, rate = 0.9) {
+            if (!text || !('speechSynthesis' in window)) return;
+            const synth = window.speechSynthesis;
+            synth.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = rate;
+            const voice = synth.getVoices().find(v => v.lang === 'en-US' && v.localService) ||
+                synth.getVoices().find(v => v.lang.startsWith('en'));
+            if (voice) utterance.voice = voice;
+            synth.speak(utterance);
+        }
+
+        function handlePronounce({ word, rate }) {
+            speak(word, rate || 0.8);
+        }
+
+        // Spoken form of each hint, read aloud when the controller reveals it
+        const HINT_SPEECH = {
+            definition: w => w.definition && `Definition: ${w.definition}`,
+            sentence: w => w.sentence && `Here it is in a sentence. ${w.sentence}`,
+            part_of_speech: w => w.part_of_speech && `Part of speech: ${w.part_of_speech}`,
+            origin: w => w.language_of_origin && `Language of origin: ${w.language_of_origin}`,
+            // Phonetic spellings like "noo-MOHN-yuh" read better as separate syllables
+            alternate_pronunciations: w => w.alternate_pronunciations && `Alternate pronunciation: ${w.alternate_pronunciations.replace(/-/g, ' ')}`,
+        };
+
+        function speakNewHints(oldState, s) {
+            // Only for the same word: a new word clears hints, and the first state after connecting isn't a reveal
+            if (!s.word || s.current_word_id !== oldState.current_word_id) return;
+            const before = new Set(oldState.revealed_info || []);
+            const added = (s.revealed_info || []).filter(type => !before.has(type));
+            const text = added.map(type => HINT_SPEECH[type]?.(s.word)).filter(Boolean).join('. ');
+            speak(text);
+        }
+
+        // Team colors are user-entered; only allow hex values into style attributes
+        const teamColor = (c) => /^#[0-9a-f]{3,8}$/i.test(c || '') ? c : '#eab308';
 
         function handleStateUpdate(msg) {
             const s = msg.state;
@@ -191,6 +235,7 @@
                 }
             }
 
+            speakNewHints(oldState, s);
             updateView(msg);
             updateTimer();
         }
@@ -227,12 +272,22 @@
                         document.getElementById('intro-grade').textContent = player.grade || '';
                         document.getElementById('intro-school').textContent = player.school || '';
                         document.getElementById('intro-fact').textContent = player.fun_fact ? `"${player.fun_fact}"` : '';
+                        const introTeam = document.getElementById('intro-team');
+                        introTeam.classList.toggle('hidden', !player.team);
+                        if (player.team) {
+                            introTeam.textContent = `Team ${player.team.name}`;
+                            introTeam.style.color = teamColor(player.team.color);
+                            introTeam.style.borderColor = teamColor(player.team.color);
+                        }
                     }
                     switchView('player_intro');
                     break;
 
                 case 'spelling':
-                    if (player) document.getElementById('spell-player').textContent = player.name;
+                    if (player) {
+                        const spellPlayer = document.getElementById('spell-player');
+                        spellPlayer.textContent = player.team ? `${player.name} · ${player.team.name}` : player.name;
+                    }
                     document.getElementById('spell-round').textContent = `Round ${s.round_number}`;
 
                     if (word) {
@@ -299,6 +354,17 @@
 
                 case 'scoreboard':
                     const scoreboard = msg.scoreboard || [];
+                    const teamScoreboard = msg.team_scoreboard || [];
+                    const teamSb = document.getElementById('team-scoreboard');
+                    teamSb.classList.toggle('hidden', teamScoreboard.length === 0);
+                    teamSb.style.gridTemplateColumns = `repeat(${Math.min(teamScoreboard.length, 4) || 1}, minmax(0, 1fr))`;
+                    teamSb.innerHTML = teamScoreboard.map(t => `
+                        <div class="bg-gray-900/60 rounded-2xl p-6 border-2 text-center" style="border-color: ${teamColor(t.team_color)}">
+                            <div class="text-2xl font-bold uppercase tracking-wider" style="color: ${teamColor(t.team_color)}">${t.team_name}</div>
+                            <div class="text-5xl font-mono font-black my-2">${t.total_correct}<span class="text-2xl opacity-50"> / ${t.total_attempts}</span></div>
+                            <div class="text-lg opacity-60">${t.active_count} of ${t.players_count} active</div>
+                        </div>`).join('');
+
                     const sbList = document.getElementById('scoreboard-list');
                     sbList.innerHTML = scoreboard.map(p => {
                         const isElim = p.eliminated;
@@ -306,7 +372,11 @@
                         const rowClass = `grid grid-cols-4 gap-4 text-3xl py-4 items-center border-b border-gray-800 ${isElim ? 'opacity-40 line-through' : ''}`;
                         return `
                         <div class="${rowClass}">
-                            <div class="col-span-2 font-bold">${p.player_name}</div>
+                            <div class="col-span-2 font-bold flex items-center gap-3">
+                                ${p.team_name ? `<span class="w-4 h-4 rounded-full flex-shrink-0" style="background-color: ${teamColor(p.team_color)}" title="${p.team_name}"></span>` : ''}
+                                ${p.player_name}
+                                ${p.team_name ? `<span class="text-lg font-normal opacity-60">${p.team_name}</span>` : ''}
+                            </div>
                             <div class="text-center font-mono">${p.total_correct} / ${total}</div>
                             <div class="text-right text-xl uppercase tracking-wider">${isElim ? `Eliminated R${p.rounds_survived}` : 'Active'}</div>
                         </div>`;

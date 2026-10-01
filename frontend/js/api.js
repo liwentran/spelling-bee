@@ -41,6 +41,12 @@ export async function bulkImportWords(sessionId, words) { return request(`/sessi
 export async function updateWord(sessionId, wordId, data) { return request(`/sessions/${sessionId}/words/${wordId}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify(data) }); }
 export async function deleteWord(sessionId, wordId) { return request(`/sessions/${sessionId}/words/${wordId}`, { method: 'DELETE' }); }
 
+// Teams
+export async function fetchTeams(sessionId) { return request(`/sessions/${sessionId}/teams/`); }
+export async function createTeam(sessionId, data) { return request(`/sessions/${sessionId}/teams/`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify(data) }); }
+export async function updateTeam(sessionId, teamId, data) { return request(`/sessions/${sessionId}/teams/${teamId}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify(data) }); }
+export async function deleteTeam(sessionId, teamId) { return request(`/sessions/${sessionId}/teams/${teamId}`, { method: 'DELETE' }); }
+
 // Turns
 export async function fetchTurns(sessionId, params = {}) {
     const query = new URLSearchParams(params).toString();

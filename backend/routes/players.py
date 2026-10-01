@@ -4,11 +4,13 @@ from typing import List, Optional
 from pydantic import BaseModel
 from database import get_session
 from models import Player, Session
+from routes.teams import validate_team
 
 router = APIRouter(prefix="/api/sessions/{session_id}/players", tags=["players"])
 
 class PlayerCreate(BaseModel):
     name: str
+    team_id: Optional[str] = None
     age: Optional[str] = None
     grade: Optional[str] = None
     school: Optional[str] = None
@@ -16,6 +18,7 @@ class PlayerCreate(BaseModel):
 
 class PlayerUpdate(BaseModel):
     name: Optional[str] = None
+    team_id: Optional[str] = None
     age: Optional[str] = None
     grade: Optional[str] = None
     school: Optional[str] = None
@@ -29,6 +32,7 @@ def create_player(session_id: str, player_data: PlayerCreate, db: DbSession = De
     session = db.get(Session, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    validate_team(db, session_id, player_data.team_id)
         
     # Get max sort_order
     statement = select(Player).where(Player.session_id == session_id).order_by(Player.sort_order.desc())
@@ -37,6 +41,7 @@ def create_player(session_id: str, player_data: PlayerCreate, db: DbSession = De
     
     player = Player(
         session_id=session_id,
+        team_id=player_data.team_id,
         name=player_data.name,
         age=player_data.age,
         grade=player_data.grade,
@@ -63,6 +68,8 @@ def update_player(session_id: str, player_id: str, player_data: PlayerUpdate, db
         raise HTTPException(status_code=404, detail="Player not found")
         
     update_data = player_data.dict(exclude_unset=True)
+    if "team_id" in update_data:
+        validate_team(db, session_id, update_data["team_id"])
     for key, value in update_data.items():
         setattr(player, key, value)
         
