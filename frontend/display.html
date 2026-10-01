@@ -85,16 +85,19 @@
         <!-- Result Mode -->
         <div id="view-result" class="hidden w-full h-full flex flex-col justify-center items-center fade-in">
             <div id="result-confetti" class="confetti hidden"></div>
+            <div id="result-owner" class="text-5xl font-bold mb-6 tracking-wide"></div>
             <h1 id="result-title" class="text-9xl font-serif font-black mb-8"></h1>
             <h2 id="result-subtitle" class="text-6xl text-white font-serif glow"></h2>
+            <div id="result-score" class="text-3xl mt-10 opacity-80 tracking-wider uppercase"></div>
+            <div id="result-winner" class="hidden text-7xl font-serif font-black mt-12 text-yellow-300 glow pulse-glow"></div>
         </div>
 
         <!-- Scoreboard Mode -->
         <div id="view-scoreboard" class="hidden w-full fade-in flex flex-col items-center pt-12">
             <h1 class="text-6xl font-serif glow font-black mb-12">Scoreboard</h1>
+            <div id="scoreboard-winner" class="hidden text-6xl font-serif font-black mb-10 text-yellow-300 glow pulse-glow"></div>
             <div id="team-scoreboard" class="hidden w-full max-w-5xl grid gap-4 mb-8"></div>
-            <h2 id="players-heading" class="hidden w-full max-w-5xl text-2xl font-bold text-gray-400 uppercase tracking-widest mb-4">Players</h2>
-            <div class="w-full max-w-5xl bg-gray-900/50 rounded-2xl p-8 border border-gray-700">
+            <div id="player-scoreboard" class="w-full max-w-5xl bg-gray-900/50 rounded-2xl p-8 border border-gray-700">
                 <div class="grid grid-cols-4 gap-4 text-2xl font-bold text-gray-400 mb-6 border-b border-gray-700 pb-4">
                     <div class="col-span-2">Player</div>
                     <div class="text-center">Score</div>
@@ -255,7 +258,7 @@
             // replays its fade/slide animations and makes the screen flash. Only redraw when
             // something other than the timer changed.
             const { timer_running, timer_seconds_remaining, timer_duration, ...viewState } = s;
-            const viewKey = JSON.stringify([viewState, msg.scoreboard, msg.team_scoreboard]);
+            const viewKey = JSON.stringify([viewState, msg.scoreboard, msg.team_scoreboard, msg.winner]);
             if (viewKey !== lastViewKey) {
                 lastViewKey = viewKey;
                 updateView(msg);
@@ -389,6 +392,22 @@
 
                     confetti.classList.add('hidden');
                     rSub.textContent = '';
+
+                    // Who just spelled, and their running total (scores arrive with the result broadcast)
+                    const rOwner = document.getElementById('result-owner');
+                    const rScore = document.getElementById('result-score');
+                    const rWinner = document.getElementById('result-winner');
+                    const isTeamTurn = s.game_mode === 'team';
+                    const ownerName = isTeamTurn ? team?.name : player?.name;
+                    rOwner.textContent = ownerName || '';
+                    rOwner.style.color = isTeamTurn && team ? teamColor(team.color) : '';
+                    const row = isTeamTurn
+                        ? (msg.team_scoreboard || []).find(t => t.team_id === s.current_team_id)
+                        : (msg.scoreboard || []).find(p => p.player_id === s.current_player_id);
+                    const out = row?.eliminated ? ' · Eliminated' : '';
+                    rScore.textContent = row ? `${row.total_correct} of ${row.total_attempts} correct${out}` : '';
+                    rWinner.classList.toggle('hidden', !msg.winner);
+                    rWinner.textContent = msg.winner ? `🏆 ${msg.winner.name} wins!` : '';
                     // Reset bg classes
                     views.result.className = 'w-full h-full flex flex-col justify-center items-center fade-in transition-colors duration-300';
 
@@ -418,7 +437,11 @@
                     const teamSb = document.getElementById('team-scoreboard');
                     const isTeamGame = s.game_mode === 'team';
                     teamSb.classList.toggle('hidden', teamScoreboard.length === 0);
-                    document.getElementById('players-heading').classList.toggle('hidden', !isTeamGame);
+                    // Team games spell as a chain, so there are no per-player scores to show
+                    document.getElementById('player-scoreboard').classList.toggle('hidden', isTeamGame);
+                    const sbWinner = document.getElementById('scoreboard-winner');
+                    sbWinner.classList.toggle('hidden', !msg.winner);
+                    sbWinner.textContent = msg.winner ? `🏆 ${msg.winner.name} wins!` : '';
                     if (isTeamGame) {
                         // Team game: ranked team rows are the main scoreboard
                         teamSb.style.gridTemplateColumns = '1fr';

@@ -87,6 +87,7 @@ export const setTimerDuration = (duration) => send({ type: 'SET_TIMER_DURATION',
 export const markCorrect = () => send({ type: 'MARK_CORRECT' });
 export const markIncorrect = () => send({ type: 'MARK_INCORRECT' });
 export const markTimeout = () => send({ type: 'MARK_TIMEOUT' });
+export const undoResult = () => send({ type: 'UNDO_RESULT' });
 export const revealInfo = (type) => send({ type: 'REVEAL_INFO', info_type: type });
 export const hideInfo = (type) => send({ type: 'HIDE_INFO', info_type: type });
 export const clearDisplay = () => send({ type: 'CLEAR_DISPLAY' });

@@ -58,23 +58,29 @@ You need three screens. They don't have to be on the same device, but they must 
 
 | Step | Individual game | Team game | What the TV shows |
 |---|---|---|---|
-| 1. Call someone up | Tap the **player's name** under *Select Player* | Tap the **team** under *Select Team*. Optionally tap a member under *Who's spelling?* (tap again to clear) | "Up Next": the player's bio, or the team with a card for every member |
+| 1. Call someone up | Tap **Next up: *name* ➡**, or tap any **player's name** under *Select Player* | Tap **Next up: *team* ➡**, or tap any **team** under *Select Team*. The whole team spells together as a chain, one letter each | "Up Next": the player's bio, or the team with a card for every member |
 | 2. Pick a word | Tab **Player's** (their words + their team's pool), **Pool**, or **All** → tap a word | Tab **Team's** (team pool + all members' words), **Pool**, or **All** → tap a word | The spelling screen with the word, the player/team name, and the round |
 | 3. Say the word | Tap **🔊 Pronounce Word** (repeat as often as asked) | same | The TV speaks the word aloud |
 | 4. Start the clock | Tap **▶**. **⏸** pauses, **↺** resets. Change the length with **−15s / +15s** under *Time per word* (only while the clock is stopped; the change is saved for the session) | same | The timer bar runs along the bottom: green → yellow → red, ticking in the last 10 seconds |
 | 5. Answer questions | When the speller asks, tap **📖 Definition**, **📝 Sentence**, **🌍 Origin**, **🔤 Part of Speech** or **🔊 Alt. Pronunciations**. Tap again to hide it | same | The hint appears on screen and is read aloud |
-| 6. Judge | Tap **✅ CORRECT** or **❌ INCORRECT**. If the clock hits zero, **⏰ TIMEOUT** happens automatically | same | Green confetti, or red/orange with the correct spelling |
+| 6. Judge | Tap **✅ CORRECT** or **❌ INCORRECT**. If the clock hits zero, **⏰ TIMEOUT** happens automatically | same | Who spelled, green confetti or red/orange with the correct spelling, and their running score |
 
-Judging records the turn and marks the word **Used** (greyed out), so it isn't picked twice. With Elimination Mode on, a miss eliminates the player, or in a team game the whole team. They then show crossed out on the controller.
+Judging saves the turn and marks the word **Used** (greyed out), so it isn't picked twice. Each word can be judged only once; the judge buttons grey out until you pick the next word. With Elimination Mode on, a miss eliminates the player, or in a team game the whole team. They then show crossed out on the controller.
 
-Then go back to step 1 for the next speller.
+**Tapped the wrong result?** Tap **↩ Undo** under the judge buttons. It deletes that turn and gives back the score, any elimination, and the word's Used mark. It also puts that team or player and word back on the TV so you can judge again. This works even after you've moved on to the next team.
+
+Then go back to step 1. Teams or players who have already gone this round get a **✓**, and the line under the list reads e.g. *Round 2 · 1 of 3 teams done*.
 
 > **Heads-up:** the spelling screen shows the word in large text for the audience. Seat spellers facing away from the TV.
 
 ### 4. Between rounds and at the end
 
-- **Next Round ➡**: bumps the round number shown on the TV.
-- **Scoreboard**: shows standings on the TV. In a team game, teams are ranked first.
+A **round** is one word for each team (or player) still in the game. When everyone has gone, the controller says *Round N complete*.
+
+- **Scoreboard**: shows standings on the TV, ranked by words spelled correctly, then by fewest misses. Eliminated teams/players go to the bottom.
+- **Next Round ➡**: starts the next round. The TV shows the new round number and the ✓ marks clear. If someone hasn't gone yet, it asks you first.
+- **Winning:** with Elimination Mode on, once only one team (or player) is left standing, the TV and the controller show **🏆 *name* wins!** Without elimination, play as many rounds as you like; the top of the scoreboard wins.
+- Scores and the round number are saved, so refreshing a screen or restarting the server doesn't lose the game.
 - **Clear Display**: returns the TV to the idle title screen, between turns or at the end.
 - **Reset** (Setup page, in the session list): wipes all turns, scores and eliminations, and marks every word unused, so you can replay. You also need it to switch an already-played session between Individual and Team.
 

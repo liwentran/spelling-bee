@@ -4,6 +4,7 @@ from typing import List, Optional, Literal
 from pydantic import BaseModel
 from database import get_session
 from models import Session, Player, Word, Turn
+from ws_manager import manager
 
 GameMode = Literal["individual", "team"]
 
@@ -122,4 +123,5 @@ def reset_session(session_id: str, db: DbSession = Depends(get_session)):
     # No db.add(session): it's already tracked, and re-adding cascades to the deleted turns (500)
     
     db.commit()
+    manager.drop_state(session_id)  # live round/selection start over too
     return {"ok": True}

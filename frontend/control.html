@@ -41,9 +41,10 @@
         <div>
             <h3 id="select-heading" class="text-sm text-gray-400 mb-2 uppercase tracking-wide">Select Player</h3>
             <div id="player-list" class="flex overflow-x-auto hide-scroll space-x-3 pb-2"></div>
-            <div id="speller-row" class="hidden mt-3">
-                <h3 class="text-xs text-gray-500 mb-2 uppercase tracking-wide">Who's spelling? <span class="normal-case">(optional)</span></h3>
-                <div id="speller-list" class="flex flex-wrap gap-2"></div>
+            <!-- Round progress: who has gone this round, and who's next -->
+            <div class="mt-2 flex items-center justify-between gap-3">
+                <div id="round-status" class="text-sm text-gray-400"></div>
+                <button id="btn-next-up" class="hidden bg-yellow-500 text-black px-4 py-2 rounded-lg font-bold active:scale-95 transition-transform whitespace-nowrap"></button>
             </div>
         </div>
 
@@ -104,6 +105,7 @@
                 <button id="btn-incorrect" class="flex-1 bg-red-600 hover:bg-red-500 active:bg-red-400 py-6 rounded-xl text-3xl font-bold shadow-lg shadow-red-900/50 active:scale-95 transition-transform">❌ INCORRECT</button>
             </div>
             <button id="btn-timeout" class="w-full bg-orange-600 hover:bg-orange-500 active:bg-orange-400 py-4 rounded-xl text-xl font-bold shadow-lg active:scale-95 transition-transform">⏰ TIMEOUT</button>
+            <button id="btn-undo" class="hidden w-full mt-4 bg-gray-800 border-2 border-gray-500 py-3 rounded-xl text-lg font-semibold active:scale-95 transition-transform"></button>
         </div>
 
         <!-- Quick Actions -->
@@ -129,6 +131,8 @@
         let gameMode = 'individual'; // individual, team (from session; server state is authoritative)
         let selectedPlayerId = null;
         let selectedTeamId = null; // team mode only
+        let lastDataVersion = null;
+        let latestWinner = null; // elimination winner, sent with result/scoreboard broadcasts
         let wordTab = 'player'; // player (or team's, in team mode), pool, all
         let timerInterval = null;
         let timerSeconds = 120;
@@ -141,8 +145,9 @@
             connStatus: document.getElementById('conn-status'),
             playerList: document.getElementById('player-list'),
             selectHeading: document.getElementById('select-heading'),
-            spellerRow: document.getElementById('speller-row'),
-            spellerList: document.getElementById('speller-list'),
+            roundStatus: document.getElementById('round-status'),
+            nextUp: document.getElementById('btn-next-up'),
+            undo: document.getElementById('btn-undo'),
             wordList: document.getElementById('word-list'),
             roundDisplay: document.getElementById('round-display'),
             timerDisplay: document.getElementById('timer-display'),
@@ -213,7 +218,6 @@
             const isTeam = gameMode === 'team';
             dom.selectHeading.textContent = isTeam ? 'Select Team' : 'Select Player';
             tabButtons.player.textContent = isTeam ? "Team's" : "Player's";
-            dom.spellerRow.classList.toggle('hidden', !isTeam || !selectedTeamId);
         }
 
         function handleStateUpdate(msg) {
@@ -221,15 +225,15 @@
             state = s;
             dom.roundDisplay.textContent = `Round ${s.round_number || 1}`;
             if (s.game_mode && s.game_mode !== gameMode) setGameMode(s.game_mode);
-            if (gameMode === 'team') {
-                selectedTeamId = s.current_team_id;
-                setGameMode(gameMode); // refresh speller row visibility
-            }
-
-            // Update selected player from server state
-            if (s.current_player_id && s.current_player_id !== selectedPlayerId) {
-                selectedPlayerId = s.current_player_id;
-            }
+            // The server is authoritative for who's up (Next Round and Undo change it too)
+            selectedTeamId = s.current_team_id;
+            selectedPlayerId = s.current_player_id;
+            // A turn was judged or undone: refetch so Used words and eliminations show
+            const turnsChanged = lastDataVersion !== null && s.data_version !== lastDataVersion;
+            if ('winner' in msg) latestWinner = msg.winner;
+            else if (turnsChanged) latestWinner = null; // e.g. an undo brought a team back
+            if (turnsChanged) refreshData();
+            lastDataVersion = s.data_version;
 
             // Sync timer state from server
             if (s.timer_seconds_remaining !== undefined) {
@@ -257,6 +261,17 @@
 
             document.getElementById('btn-pronounce').disabled = !s.current_word_id;
 
+            // Judge once per word; Undo reopens it
+            const owner = gameMode === 'team' ? s.current_team_id : s.current_player_id;
+            ['btn-correct', 'btn-incorrect', 'btn-timeout'].forEach(id => {
+                const btn = document.getElementById(id);
+                btn.disabled = !owner || !s.current_word_id || !!s.result;
+                btn.classList.toggle('opacity-30', btn.disabled);
+            });
+            const lt = s.last_turn;
+            dom.undo.classList.toggle('hidden', !lt);
+            if (lt) dom.undo.textContent = `↩ Undo ${RESULT_LABEL[lt.result] || lt.result} · ${lt.name || ''} · "${lt.word || ''}"`;
+
             // Timer ticks arrive every second; only rebuild the lists when something else changed
             const { timer_running, timer_seconds_remaining, timer_duration, ...listState } = s;
             const listKey = JSON.stringify(listState);
@@ -264,9 +279,47 @@
                 lastListKey = listKey;
                 renderPlayers();
                 renderWords();
+                renderRoundStatus();
             }
         }
         let lastListKey = null;
+        const RESULT_LABEL = { correct: '✅ Correct', incorrect: '❌ Incorrect', timeout: '⏰ Timeout' };
+
+        async function refreshData() {
+            const sid = dom.select.value;
+            if (!sid) return;
+            try {
+                [words, players, teams] = await Promise.all([api.fetchWords(sid), api.fetchPlayers(sid), api.fetchTeams(sid)]);
+                renderPlayers();
+                renderWords();
+                renderRoundStatus();
+            } catch (e) { console.error('Failed to refresh:', e); }
+        }
+
+        // "Round 2 · 1 of 3 teams done" plus a button for the next one who hasn't gone yet
+        function renderRoundStatus() {
+            const isTeam = gameMode === 'team';
+            const noun = isTeam ? 'teams' : 'players';
+            const active = (isTeam ? teams : players).filter(x => !x.eliminated);
+            const done = new Set(state.round_done || []);
+            const waiting = active.filter(x => !done.has(x.id));
+            const doneCount = active.length - waiting.length;
+            const currentId = isTeam ? state.current_team_id : state.current_player_id;
+
+            let text = `Round ${state.round_number || 1} · ${doneCount} of ${active.length} ${noun} done`;
+            if (latestWinner) text = `🏆 ${latestWinner.name} wins!`;
+            else if (active.length && !waiting.length) text = `Round ${state.round_number || 1} complete. Show the Scoreboard, then tap Next Round.`;
+            dom.roundStatus.textContent = text;
+
+            // Suggest the next one once the current one has been judged (or nobody is up)
+            const next = waiting.find(x => x.id !== currentId);
+            const show = !latestWinner && next && (!currentId || done.has(currentId));
+            dom.nextUp.classList.toggle('hidden', !show);
+            if (show) {
+                dom.nextUp.textContent = `Next up: ${next.name} ➡`;
+                dom.nextUp.onclick = () => isTeam ? window.selectTeam(next.id) : window.selectPlayer(next.id);
+            }
+        }
 
         // --- Timer Logic (runs on controller, syncs to display via WS) ---
         function startLocalTimer() {
@@ -280,7 +333,6 @@
                 if (timerSeconds <= 0) {
                     stopTimer();
                     ws.markTimeout();
-                    recordTurn('timeout');
                 }
             }, 1000);
         }
@@ -324,31 +376,6 @@
             else dom.timerBar.className = 'h-full transition-all duration-1000 bg-red-500';
         }
 
-        // --- Record turn to DB ---
-        async function recordTurn(result) {
-            // Team mode: the team owns the turn (speller optional). Individual mode: the player does.
-            const owner = gameMode === 'team' ? state.current_team_id : state.current_player_id;
-            if (!owner || !state.current_word_id) return;
-            const sid = dom.select.value;
-            try {
-                await api.recordTurn(sid, {
-                    team_id: gameMode === 'team' ? state.current_team_id : null,
-                    player_id: state.current_player_id,
-                    word_id: state.current_word_id,
-                    round_number: state.round_number || 1,
-                    result: result,
-                    time_taken_seconds: timerDuration - timerSeconds
-                });
-                // Refresh words to update used status
-                words = await api.fetchWords(sid);
-                // Refresh players/teams for elimination updates
-                players = await api.fetchPlayers(sid);
-                teams = await api.fetchTeams(sid);
-                renderWords();
-                renderPlayers();
-            } catch (e) { console.error('Failed to record turn:', e); }
-        }
-
         // --- Render ---
         // Team colors are user-entered; only allow hex values into style attributes
         const teamColor = (c) => /^#[0-9a-f]{3,8}$/i.test(c || '') ? c : '#eab308';
@@ -365,27 +392,18 @@
                 if (isActive) { style += `background-color: ${color};`; cls = 'text-black'; }
                 else if (t.eliminated) cls = 'bg-gray-800 text-gray-500 line-through opacity-60';
                 const count = players.filter(p => p.team_id === t.id).length;
-                return `<button onclick="window.selectTeam('${t.id}')" class="${pillBase} ${cls}" style="${style}">${t.name} <span class="text-sm font-normal opacity-70">${count}</span></button>`;
+                const doneMark = (state.round_done || []).includes(t.id) ? '✓ ' : '';
+                return `<button onclick="window.selectTeam('${t.id}')" class="${pillBase} ${cls}" style="${style}">${doneMark}${t.name} <span class="text-sm font-normal opacity-70">${count}</span></button>`;
             }).join('') || '<div class="text-gray-500 py-2">No teams — add them in Setup</div>';
-
-            const members = players.filter(p => p.team_id === selectedTeamId);
-            dom.spellerList.innerHTML = members.map(p => {
-                const isSpeller = state.current_player_id === p.id;
-                return `<button onclick="window.selectSpeller('${p.id}')" class="px-4 py-2 rounded-full text-base font-semibold ${isSpeller ? 'bg-yellow-500 text-black' : 'bg-gray-700 text-white'}">${p.name}</button>`;
-            }).join('') || '<div class="text-gray-500 text-sm">No players on this team</div>';
         }
 
         window.selectTeam = (id) => {
             selectedTeamId = id;
             ws.setActiveTeam(id);
             ws.showTeamIntro();
-            setGameMode(gameMode);
             renderPlayers();
             renderWords();
         };
-
-        // Tapping the current speller again clears the highlight
-        window.selectSpeller = (id) => ws.setActivePlayer(state.current_player_id === id ? null : id);
 
         function renderPlayers() {
             if (gameMode === 'team') return renderTeams();
@@ -399,7 +417,8 @@
 
                 const team = findTeam(p.team_id);
                 const dot = team ? `<span class="inline-block w-3 h-3 rounded-full mr-2" style="background-color: ${teamColor(team.color)}"></span>` : '';
-                return `<button onclick="window.selectPlayer('${p.id}')" class="${baseClass} ${colorClass}">${dot}${p.name}</button>`;
+                const doneMark = (state.round_done || []).includes(p.id) ? '✓ ' : '';
+                return `<button onclick="window.selectPlayer('${p.id}')" class="${baseClass} ${colorClass}">${dot}${doneMark}${p.name}</button>`;
             }).join('');
         }
 
@@ -509,21 +528,12 @@
         });
 
         // Judge buttons
-        document.getElementById('btn-correct').onclick = () => {
-            ws.markCorrect();
-            stopTimer();
-            recordTurn('correct');
-        };
-        document.getElementById('btn-incorrect').onclick = () => {
-            ws.markIncorrect();
-            stopTimer();
-            recordTurn('incorrect');
-        };
-        document.getElementById('btn-timeout').onclick = () => {
-            ws.markTimeout();
-            stopTimer();
-            recordTurn('timeout');
-        };
+        // Judging saves the turn on the server (once per word)
+        document.getElementById('btn-correct').onclick = () => { stopTimer(); ws.markCorrect(); };
+        document.getElementById('btn-incorrect').onclick = () => { stopTimer(); ws.markIncorrect(); };
+        document.getElementById('btn-timeout').onclick = () => { stopTimer(); ws.markTimeout(); };
+        // Mis-tap: delete the last judged turn and put that word back on screen to judge again
+        dom.undo.onclick = () => { stopTimer(); ws.undoResult(); };
 
         // Quick actions
         document.getElementById('btn-clear').onclick = () => {
@@ -536,7 +546,14 @@
         };
         document.getElementById('btn-pronounce').onclick = () => ws.pronounceWord();
         document.getElementById('btn-scoreboard').onclick = ws.showScoreboard;
-        document.getElementById('btn-next-round').onclick = ws.nextRound;
+        document.getElementById('btn-next-round').onclick = () => {
+            const isTeam = gameMode === 'team';
+            const done = new Set(state.round_done || []);
+            const waiting = (isTeam ? teams : players).filter(x => !x.eliminated && !done.has(x.id));
+            if (waiting.length && !confirm(`${waiting.map(x => x.name).join(', ')} haven't gone this round. Start round ${(state.round_number || 1) + 1} anyway?`)) return;
+            stopTimer();
+            ws.nextRound();
+        };
 
         init();
     </script>

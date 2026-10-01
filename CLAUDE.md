@@ -92,12 +92,13 @@ The shell is **zsh, which doesn't word-split unquoted variables**: `R="uv run ..
 
 | | Individual | Team |
 |---|---|---|
-| Turn owner | `Turn.player_id` (required) | `Turn.team_id` (required). `player_id` is the optional speller |
+| Turn owner | `Turn.player_id` (required) | `Turn.team_id` (required). The team spells as a chain, so `player_id` is null (the column stays for old data) |
 | Elimination (`elimination_mode`) | `Player.eliminated` | `Team.eliminated` (one miss knocks out the whole team) |
-| Controller | Select Player → `SET_ACTIVE_PLAYER` + `SHOW_PLAYER_INTRO` | Select Team → `SET_ACTIVE_TEAM` + `SHOW_TEAM_INTRO`, then the optional speller via `SET_ACTIVE_PLAYER` (doesn't change `display_mode`) |
+| Controller | Select Player → `SET_ACTIVE_PLAYER` + `SHOW_PLAYER_INTRO` | Select Team → `SET_ACTIVE_TEAM` + `SHOW_TEAM_INTRO`. No individual speller |
 | "Player's"/"Team's" word tab | player's words + their team's pool | team pool + every member's words |
 | TV intro | `player_intro` | `team_intro`: team name and a card per member |
-| Scoreboard | player rows, plus team cards if teams exist | ranked team rows first, then player rows (speller turns) |
+| Scoreboard | player rows, plus team cards if teams exist | ranked team rows only |
+| Round progress (`round_done`) | player ids | team ids |
 | Setup UI | team UI hidden (existing team data is kept) | Teams card shown; ⚠ on unassigned players |
 
 Both modes share the same frontend pages, which branch on `game_mode`: the controller reads it from the session and from `state.game_mode`. When you add a feature, decide what it does in each mode.
@@ -112,11 +113,12 @@ Both modes share the same frontend pages, which branch on `game_mode`: the contr
   - both null: in the session pool.
 
   In the controller, the "Player's" tab shows the player's own words plus their team's pool. The "Pool" tab shows only the session pool.
-- `Turn` records a judged attempt. `POST /turns` also marks the word `used` and, in elimination mode, eliminates the player (individual) or the team (team) on a non-correct result. Reset clears turns and both kinds of elimination.
+- `Turn` records a judged attempt. `routes/turns.py` `save_turn()` also marks the word `used` and, in elimination mode, eliminates the player (individual) or the team (team) on a non-correct result. `delete_turn()` reverses it: `used` and `eliminated` are re-derived from the remaining turns. The controller judges over WS (`MARK_*` calls `save_turn`); `POST /turns` and `DELETE /turns/{id}` are the REST equivalents. Reset clears turns and both kinds of elimination.
+- **Scoring** (`scoring.py`): score = turns judged correct. Ranking: still standing, then most correct, then fewest misses. In elimination mode `winner` is set once exactly one contestant is left standing.
 - **Session JSON** (`routes/roster.py`, model `RosterImport`) is the full definition: session settings (`name`, `game_mode`, `timer_duration_seconds` 15–600, `elimination_mode`), teams, players and words. Export emits all of it. Import applies only what is present, and `null` settings mean "leave as is". If you add a Session field users should control, add it to `RosterImport`, `SESSION_FIELDS`, the export, `JSON_RULES`/`BLANK_TEMPLATE` in setup.html, and the README field table.
 - **Roster import** upserts teams, players and words **by name, case-insensitively**. It never deletes, and never renames teams or players, because their names are the match key (the session `name` setting does rename the session). Only the fields present in the JSON change: `model_dump(exclude_unset=True)` plus `_apply()`. Words match on (text, owner). The Setup "Copy for AI" instructions describe these rules, so keep them in sync if you change the semantics.
 - **SQLAlchemy pitfall:** after `db.delete()`-ing children, don't `db.add()` an already-persistent parent whose loaded collection still holds them. A lazy load in between autoflushes the deletes, and the re-add's save-update cascade then raises "Instance … has been deleted". This is why Reset returned a 500 whenever turns existed. Tracked objects don't need `db.add()` at all.
-- `Session.status` and `current_round` exist in the DB, but the live round number is `GameState.round_number`, which is in memory.
+- **Rounds:** `Session.current_round` is the saved round. `NEXT_ROUND` writes it, and `_sync_session_settings` reads it back into `GameState.round_number` (on connect, `CLEAR_DISPLAY`, and when a state is first created). Who has gone this round (`round_done`) is derived from turns with that `round_number`, so a restart loses only the current selection, never scores or progress. Reset calls `manager.drop_state()` so the live round starts over too. `Session.status` is unused.
 - Timestamps are timezone-aware UTC (`datetime.now(timezone.utc)`).
 
 ## Real-time protocol (`ws_manager.py` ↔ `js/ws.js`)
@@ -128,6 +130,7 @@ Both modes share the same frontend pages, which branch on `game_mode`: the contr
 - The **controller owns the timer**. It counts down locally and sends `UPDATE_TIMER` every second. The display only renders it.
 - **Timer ticks must not redraw views.** Each tick broadcasts the full state, so `display.html` (`lastViewKey`) and `control.html` (`lastListKey`) compare the state minus `timer_*` and skip re-rendering when only the timer changed. `switchView` replays the entrance animation only when the screen actually changes. Without this the TV flashes every second. Keep any new per-tick field out of those keys.
 - **Timer length** is `Session.timer_duration_seconds`. It's edited in Setup or with the controller's −15s/+15s, which also sends `RESET_TIMER {duration}`, and that sets `GameState.timer_duration`. `_sync_session_settings` re-reads it, along with `game_mode`, on connect and on `CLEAR_DISPLAY`. The TV's bar colors are percentages of `timer_duration`, so it must match the session.
+- **Judging** (`MARK_CORRECT/INCORRECT/TIMEOUT`) saves the turn server-side and is ignored if the word on screen already has a result, so double taps and a late auto-timeout can't count twice. `state.last_turn` holds the latest judged turn. `UNDO_RESULT` deletes it and puts its team/player and word back in `spelling` mode. `state.data_version` goes up whenever turns change; the controller refetches words/teams/players when it does. Result and scoreboard broadcasts carry `scoreboard`, `team_scoreboard` and `winner`.
 - `display_mode` is one of `idle | player_intro | team_intro | spelling | result | scoreboard`, and drives which view `display.html` shows.
 - When the controller reveals a hint, the display also speaks it. `speakNewHints` diffs `revealed_info` for the same word.
 

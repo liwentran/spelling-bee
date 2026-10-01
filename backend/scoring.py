@@ -15,7 +15,7 @@ def _tally(turns) -> dict:
 
 
 def compute_scoreboard(db: DbSession, session_id: str) -> dict:
-    """Per-player and per-team scores for a session: {"players": [...], "teams": [...]}.
+    """Per-player and per-team scores for a session: {"players": [...], "teams": [...], "winner": ...}.
 
     Team mode: turns carry team_id (player_id is the optional speller), and teams are eliminated.
     Individual mode: turns carry player_id; team totals (if teams exist) sum their members.
@@ -65,6 +65,16 @@ def compute_scoreboard(db: DbSession, session_id: str) -> dict:
             "rounds_survived": rounds_survived(team),
             **_tally(team_turns),
         })
-    team_rows.sort(key=lambda t: (t["eliminated"], -t["total_correct"]))
+    # Still standing first, then most words right, then fewest misses
+    rank = lambda r: (r["eliminated"], -r["total_correct"], r["total_attempts"] - r["total_correct"])
+    team_rows.sort(key=rank)
 
-    return {"players": player_rows, "teams": team_rows}
+    # Elimination mode ends when one contestant is left standing (once someone has been knocked out)
+    winner = None
+    contestants = team_rows if sess.game_mode == "team" else [{**p, "name": p["player_name"]} for p in player_rows]
+    standing = [c for c in contestants if not c["eliminated"]]
+    if sess.elimination_mode and len(contestants) > 1 and len(standing) == 1:
+        w = standing[0]
+        winner = {"name": w.get("team_name") if sess.game_mode == "team" else w["name"], "color": w.get("team_color")}
+
+    return {"players": player_rows, "teams": team_rows, "winner": winner}

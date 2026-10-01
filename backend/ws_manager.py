@@ -18,7 +18,10 @@ class GameState:
         self.revealed_info: set = set()
         self.display_mode: str = 'idle'  # idle, player_intro, team_intro, spelling, result, scoreboard
         self.result: Optional[str] = None  # correct, incorrect, timeout
-        self.round_number: int = 1
+        self.round_number: int = 1  # mirrors Session.current_round (saved on NEXT_ROUND)
+        self.round_done: list = []  # team ids (team mode) or player ids with a turn this round
+        self.last_turn: Optional[dict] = None  # the most recent judged turn, for UNDO_RESULT
+        self.data_version: int = 0  # bumped when turns change, so the controller refetches words/teams
         # Cached details for broadcast
         self.player_details: Optional[dict] = None
         self.team_details: Optional[dict] = None
@@ -37,6 +40,9 @@ class GameState:
             "display_mode": self.display_mode,
             "result": self.result,
             "round_number": self.round_number,
+            "round_done": self.round_done,
+            "last_turn": self.last_turn,
+            "data_version": self.data_version,
             "player": self.player_details,
             "team": self.team_details,
             "word": self.word_details,
@@ -93,8 +99,8 @@ def _fetch_team(team_id: str) -> Optional[dict]:
 
 
 def _sync_session_settings(state: "GameState", session_id: str):
-    """Pull game mode and timer length from the DB (they're edited in Setup / the controller).
-    A running or paused-mid-word timer is left alone; an idle one is reset to the new length."""
+    """Pull game mode, timer length and round from the DB (edited in Setup / the controller, or
+    reset). A running or paused-mid-word timer is left alone; an idle one is reset to the new length."""
     from models import Session as SessionModel
     with SQLSession(get_engine()) as session:
         sess = session.get(SessionModel, session_id)
@@ -104,6 +110,79 @@ def _sync_session_settings(state: "GameState", session_id: str):
         if not state.timer_running and state.timer_seconds_remaining in (0, state.timer_duration):
             state.timer_seconds_remaining = sess.timer_duration_seconds
         state.timer_duration = sess.timer_duration_seconds
+        state.round_number = sess.current_round
+        _refresh_round_done(state, session, session_id)
+
+
+def _refresh_round_done(state: "GameState", session, session_id: str):
+    """Who has already had a turn this round, derived from saved turns so it survives restarts."""
+    from models import Turn
+    turns = session.exec(select(Turn).where(Turn.session_id == session_id, Turn.round_number == state.round_number)).all()
+    key = "team_id" if state.game_mode == "team" else "player_id"
+    state.round_done = list(dict.fromkeys(getattr(t, key) for t in turns if getattr(t, key)))
+
+
+def _judge(state: "GameState", session_id: str, result: str) -> bool:
+    """Save the turn for the word on screen. Each word is judged once; UNDO_RESULT reopens it."""
+    from models import Session as SessionModel
+    from routes.turns import TurnCreate, save_turn
+    owner = state.current_team_id if state.game_mode == "team" else state.current_player_id
+    if not owner or not state.current_word_id or state.result:
+        return False
+    with SQLSession(get_engine()) as session:
+        sess = session.get(SessionModel, session_id)
+        turn = save_turn(session, sess, TurnCreate(
+            team_id=state.current_team_id if state.game_mode == "team" else None,
+            player_id=state.current_player_id,
+            word_id=state.current_word_id,
+            round_number=state.round_number,
+            result=result,
+            time_taken_seconds=max(0, state.timer_duration - state.timer_seconds_remaining),
+        ))
+        session.commit()
+        owner_details = (state.team_details if state.game_mode == "team" else state.player_details) or {}
+        state.last_turn = {"id": turn.id, "result": result,
+                           "word": (state.word_details or {}).get("word"), "name": owner_details.get("name")}
+        _refresh_round_done(state, session, session_id)
+    state.data_version += 1
+    return True
+
+
+def _undo_last_turn(state: "GameState", session_id: str):
+    """Delete the last judged turn and put its team/player and word back on screen to re-judge."""
+    from models import Turn
+    from routes.turns import delete_turn
+    with SQLSession(get_engine()) as session:
+        turn = session.get(Turn, state.last_turn["id"])
+        if turn:
+            team_id, player_id, word_id = turn.team_id, turn.player_id, turn.word_id
+            delete_turn(session, turn)
+            session.commit()
+            if state.current_team_id != team_id:
+                state.current_team_id = team_id
+                state.team_details = _fetch_team(team_id) if team_id else None
+            if state.current_player_id != player_id:
+                state.current_player_id = player_id
+                state.player_details = _fetch_player(player_id) if player_id else None
+            if state.current_word_id != word_id:
+                state.current_word_id = word_id
+                state.revealed_info.clear()
+            state.word_details = _fetch_word(word_id)
+            state.display_mode = "spelling"
+        _refresh_round_done(state, session, session_id)
+    state.last_turn = None
+    state.result = None
+    state.timer_running = False
+    state.data_version += 1
+
+
+def _save_round(session_id: str, round_number: int):
+    from models import Session as SessionModel
+    with SQLSession(get_engine()) as session:
+        sess = session.get(SessionModel, session_id)
+        if sess:
+            sess.current_round = round_number
+            session.commit()
 
 
 def _fetch_word(word_id: str) -> Optional[dict]:
@@ -144,8 +223,13 @@ class ConnectionManager:
 
     def get_state(self, session_id: str) -> GameState:
         if session_id not in self.game_states:
-            self.game_states[session_id] = GameState()
+            state = self.game_states[session_id] = GameState()
+            _sync_session_settings(state, session_id)
         return self.game_states[session_id]
+
+    def drop_state(self, session_id: str):
+        """Forget the live game (after a Reset); the next connection rebuilds it from the DB."""
+        self.game_states.pop(session_id, None)
 
     async def connect(self, session_id: str, ws: WebSocket):
         await ws.accept()
@@ -220,20 +304,19 @@ class ConnectionManager:
             state.timer_duration = command.get("duration", 120)
             state.timer_seconds_remaining = state.timer_duration
 
-        elif cmd_type == "MARK_CORRECT":
-            state.result = "correct"
+        elif cmd_type in ("MARK_CORRECT", "MARK_INCORRECT", "MARK_TIMEOUT"):
+            # The server records the turn, so a double tap or a late timeout can't count twice
+            result = cmd_type.removeprefix("MARK_").lower()
+            if not _judge(state, session_id, result):
+                return
+            state.result = result
             state.display_mode = "result"
             state.timer_running = False
 
-        elif cmd_type == "MARK_INCORRECT":
-            state.result = "incorrect"
-            state.display_mode = "result"
-            state.timer_running = False
-
-        elif cmd_type == "MARK_TIMEOUT":
-            state.result = "timeout"
-            state.display_mode = "result"
-            state.timer_running = False
+        elif cmd_type == "UNDO_RESULT":
+            if not state.last_turn:
+                return
+            _undo_last_turn(state, session_id)
 
         elif cmd_type == "REVEAL_INFO":
             info_type = command.get("info_type")
@@ -265,9 +348,19 @@ class ConnectionManager:
             state.display_mode = "player_intro"
 
         elif cmd_type == "NEXT_ROUND":
+            # Saved to the session so a restart or redeploy keeps the round; the TV shows the new round
             state.round_number += 1
+            _save_round(session_id, state.round_number)
+            state.round_done = []
+            state.last_turn = None
+            state.display_mode = "idle"
+            state.current_team_id = state.team_details = None
+            state.current_player_id = state.player_details = None
+            state.current_word_id = state.word_details = None
             state.result = None
             state.revealed_info.clear()
+            state.timer_running = False
+            state.timer_seconds_remaining = state.timer_duration
 
         elif cmd_type == "PLAY_SOUND":
             # Just broadcast sound command, don't change state
@@ -287,11 +380,12 @@ class ConnectionManager:
         # Build broadcast payload
         payload = {"type": "STATE_UPDATE", "state": state.to_dict()}
 
-        # Include scoreboard data when in scoreboard mode
-        if state.display_mode == "scoreboard":
+        # Scores ride along on the scoreboard and on result screens (which show the new total)
+        if state.display_mode in ("scoreboard", "result"):
             scores = _fetch_scoreboard(session_id)
             payload["scoreboard"] = scores["players"]
             payload["team_scoreboard"] = scores["teams"]
+            payload["winner"] = scores["winner"]
 
         await self.broadcast(session_id, payload)
 
