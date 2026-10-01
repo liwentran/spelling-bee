@@ -1,0 +1,18 @@
+services:
+  spelling-bee-backend:
+    build: ./backend
+    container_name: spelling-bee-backend
+    restart: unless-stopped
+    ports:
+      - "8003:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@general-db:5432/spellingbee
+    volumes:
+      - ./backend:/app
+      - ./frontend:/frontend
+    networks:
+      - dev-network
+
+networks:
+  dev-network:
+    external: true

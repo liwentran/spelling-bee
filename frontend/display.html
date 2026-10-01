@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display - Spelling Bee</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0a0a1a; color: #f5e6c8; font-family: 'Inter', sans-serif; overflow: hidden; margin: 0; padding: 0; }
+        .font-serif { font-family: 'Playfair Display', serif; }
+        .glow { text-shadow: 0 0 20px rgba(245, 230, 200, 0.3); }
+        .bg-radial { background: radial-gradient(circle at center, #1a1a3a 0%, #0a0a1a 100%); }
+        .word-text { font-size: clamp(60px, 12vw, 160px); line-height: 1.1; }
+
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .slide-up { animation: slideUp 0.6s ease-out forwards; }
+        .pulse-glow { animation: pulseGlow 2s infinite; }
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        .confetti { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(50px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulseGlow { 0% { text-shadow: 0 0 10px rgba(245, 230, 200, 0.2); } 50% { text-shadow: 0 0 30px rgba(245, 230, 200, 0.6); } 100% { text-shadow: 0 0 10px rgba(245, 230, 200, 0.2); } }
+        @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+
+        .particle { position: absolute; width: 10px; height: 10px; border-radius: 50%; }
+    </style>
+</head>
+<body class="bg-radial h-screen w-screen flex flex-col justify-center items-center relative">
+
+    <div id="click-to-start" class="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center cursor-pointer">
+        <h1 class="text-4xl font-serif glow mb-4">🐝 Spelling Bee TV Display</h1>
+        <p class="text-xl">Click anywhere to connect and enable audio</p>
+        <p class="text-sm text-gray-400 mt-4" id="session-info"></p>
+    </div>
+
+    <!-- Views Container -->
+    <div id="views" class="w-full h-full flex flex-col justify-center items-center relative z-10 max-w-6xl mx-auto px-8">
+
+        <!-- Idle View -->
+        <div id="view-idle" class="text-center w-full fade-in">
+            <h1 class="text-8xl font-serif glow font-black mb-8 pulse-glow">🐝 Spelling Bee</h1>
+            <h2 id="idle-session-name" class="text-4xl text-yellow-500 opacity-80">Loading...</h2>
+            <div id="idle-round" class="mt-8 text-2xl tracking-widest uppercase opacity-50"></div>
+        </div>
+
+        <!-- Player Intro View -->
+        <div id="view-player-intro" class="hidden text-center w-full slide-up">
+            <div class="text-yellow-500 text-3xl mb-4 tracking-widest uppercase">Up Next</div>
+            <h1 id="intro-name" class="text-9xl font-serif glow font-black mb-8 text-white"></h1>
+            <div class="flex justify-center space-x-8 text-3xl opacity-80 mb-8">
+                <span id="intro-age"></span>
+                <span id="intro-grade"></span>
+                <span id="intro-school"></span>
+            </div>
+            <div id="intro-fact" class="text-4xl italic text-yellow-300 opacity-90 max-w-4xl mx-auto"></div>
+        </div>
+
+        <!-- Spelling Mode -->
+        <div id="view-spelling" class="hidden w-full h-full flex flex-col justify-between py-12 fade-in">
+            <div class="flex justify-between items-center text-3xl font-bold opacity-70">
+                <div id="spell-player" class="uppercase tracking-widest text-yellow-500"></div>
+                <div id="spell-round" class="uppercase tracking-widest"></div>
+            </div>
+
+            <div class="flex-grow flex flex-col justify-center items-center text-center">
+                <h1 id="spell-word" class="word-text font-serif glow font-black mb-8"></h1>
+
+                <div id="revealed-info" class="flex flex-col items-center space-y-6 w-full max-w-4xl">
+                    <!-- Revealed content injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Mode -->
+        <div id="view-result" class="hidden w-full h-full flex flex-col justify-center items-center fade-in">
+            <div id="result-confetti" class="confetti hidden"></div>
+            <h1 id="result-title" class="text-9xl font-serif font-black mb-8"></h1>
+            <h2 id="result-subtitle" class="text-6xl text-white font-serif glow"></h2>
+        </div>
+
+        <!-- Scoreboard Mode -->
+        <div id="view-scoreboard" class="hidden w-full fade-in flex flex-col items-center pt-12">
+            <h1 class="text-6xl font-serif glow font-black mb-12">Scoreboard</h1>
+            <div class="w-full max-w-5xl bg-gray-900/50 rounded-2xl p-8 border border-gray-700">
+                <div class="grid grid-cols-4 gap-4 text-2xl font-bold text-gray-400 mb-6 border-b border-gray-700 pb-4">
+                    <div class="col-span-2">Player</div>
+                    <div class="text-center">Score</div>
+                    <div class="text-right">Status</div>
+                </div>
+                <div id="scoreboard-list" class="space-y-4 max-h-[60vh] overflow-y-auto pr-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timer Bar -->
+    <div id="timer-container" class="absolute bottom-0 left-0 w-full h-8 bg-gray-900 hidden z-20">
+        <div id="display-timer-bar" class="h-full bg-green-500 transition-all duration-1000 w-full shadow-[0_0_15px_rgba(74,222,128,0.5)]"></div>
+        <div id="display-timer-text" class="absolute inset-0 flex items-center justify-center font-bold text-2xl drop-shadow-md"></div>
+        <div id="display-timer-paused" class="absolute inset-0 flex items-center justify-center font-black text-2xl bg-black/50 tracking-widest hidden">PAUSED</div>
+    </div>
+
+    <script type="module">
+        import * as api from './js/api.js';
+        import * as ws from './js/ws.js';
+        import * as sounds from './js/sounds.js';
+
+        let state = {};
+        let lastDisplayMode = null;
+        let lastResult = null;
+        let lastTickSecond = -1;
+
+        const views = {
+            idle: document.getElementById('view-idle'),
+            player_intro: document.getElementById('view-player-intro'),
+            spelling: document.getElementById('view-spelling'),
+            result: document.getElementById('view-result'),
+            scoreboard: document.getElementById('view-scoreboard')
+        };
+
+        const dom = {
+            clickToStart: document.getElementById('click-to-start'),
+            timerContainer: document.getElementById('timer-container'),
+            timerBar: document.getElementById('display-timer-bar'),
+            timerText: document.getElementById('display-timer-text'),
+            timerPaused: document.getElementById('display-timer-paused')
+        };
+
+        const sessionId = new URLSearchParams(window.location.search).get('session') || window.location.hash.slice(1);
+
+        // Show session ID hint on click-to-start screen
+        if (sessionId) {
+            document.getElementById('session-info').textContent = `Session: ${sessionId}`;
+        } else {
+            document.getElementById('session-info').textContent = 'Add ?session=ID to URL to connect';
+        }
+
+        dom.clickToStart.onclick = async () => {
+            dom.clickToStart.classList.add('hidden');
+            sounds.initAudio();
+
+            if (sessionId) {
+                ws.connect(sessionId);
+                ws.onStateUpdate(handleStateUpdate);
+                ws.onSound(handleSound);
+                try {
+                    const sess = await api.getSession(sessionId);
+                    document.getElementById('idle-session-name').textContent = sess.name;
+                } catch (e) {
+                    document.getElementById('idle-session-name').textContent = 'Session not found';
+                }
+            } else {
+                document.getElementById('idle-session-name').textContent = 'No Session Selected';
+            }
+        };
+
+        function handleSound(sound) {
+            switch (sound) {
+                case 'bell': sounds.playBell(); break;
+                case 'correct': sounds.playCorrect(); break;
+                case 'tick': sounds.playTick(); break;
+                case 'countdown': sounds.playCountdown(); break;
+            }
+        }
+
+        function handleStateUpdate(msg) {
+            const s = msg.state;
+            const oldState = state;
+            state = s;
+
+            // Play sounds on result transitions
+            if (s.display_mode === 'result' && oldState.display_mode !== 'result') {
+                if (s.result === 'correct') {
+                    sounds.playCorrect();
+                } else {
+                    sounds.playBell();
+                }
+            }
+
+            // Timer tick sounds in last 10 seconds
+            if (s.display_mode === 'spelling' && s.timer_running && s.timer_seconds_remaining <= 10 && s.timer_seconds_remaining > 0) {
+                const currentSecond = Math.ceil(s.timer_seconds_remaining);
+                if (currentSecond !== lastTickSecond) {
+                    lastTickSecond = currentSecond;
+                    if (s.timer_seconds_remaining <= 5) {
+                        sounds.playCountdown();
+                    } else {
+                        sounds.playTick();
+                    }
+                }
+            }
+
+            updateView(msg);
+            updateTimer();
+        }
+
+        function switchView(viewName) {
+            Object.entries(views).forEach(([name, el]) => {
+                if (name === viewName) {
+                    el.classList.remove('hidden');
+                    // Re-trigger animation
+                    el.style.animation = 'none';
+                    el.offsetHeight;
+                    el.style.animation = null;
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
+        }
+
+        function updateView(msg) {
+            const s = state;
+            const player = s.player;  // Included in state broadcast by backend
+            const word = s.word;      // Included in state broadcast by backend
+
+            switch (s.display_mode) {
+                case 'idle':
+                    document.getElementById('idle-round').textContent = s.round_number ? `Round ${s.round_number}` : '';
+                    switchView('idle');
+                    break;
+
+                case 'player_intro':
+                    if (player) {
+                        document.getElementById('intro-name').textContent = player.name;
+                        document.getElementById('intro-age').textContent = player.age ? `Age ${player.age}` : '';
+                        document.getElementById('intro-grade').textContent = player.grade || '';
+                        document.getElementById('intro-school').textContent = player.school || '';
+                        document.getElementById('intro-fact').textContent = player.fun_fact ? `"${player.fun_fact}"` : '';
+                    }
+                    switchView('player_intro');
+                    break;
+
+                case 'spelling':
+                    if (player) document.getElementById('spell-player').textContent = player.name;
+                    document.getElementById('spell-round').textContent = `Round ${s.round_number}`;
+
+                    if (word) {
+                        document.getElementById('spell-word').textContent = word.word;
+
+                        const revInfo = document.getElementById('revealed-info');
+                        revInfo.innerHTML = '';
+
+                        const revealedInfo = s.revealed_info || [];
+                        const infoClass = "bg-gray-800/80 p-4 rounded-xl border border-gray-600 text-2xl w-full text-center slide-up shadow-lg";
+                        const smallClass = "bg-gray-800/50 px-6 py-2 rounded-full border border-gray-700 text-xl inline-block mx-2 slide-up";
+
+                        if (revealedInfo.includes('definition') && word.definition) {
+                            revInfo.innerHTML += `<div class="${infoClass}">📖 ${word.definition}</div>`;
+                        }
+                        if (revealedInfo.includes('sentence') && word.sentence) {
+                            revInfo.innerHTML += `<div class="${infoClass} italic">📝 "${word.sentence}"</div>`;
+                        }
+
+                        let badges = '';
+                        if (revealedInfo.includes('part_of_speech') && word.part_of_speech) {
+                            badges += `<div class="${smallClass}">🔤 ${word.part_of_speech}</div>`;
+                        }
+                        if (revealedInfo.includes('origin') && word.language_of_origin) {
+                            badges += `<div class="${smallClass}">🌍 ${word.language_of_origin}</div>`;
+                        }
+                        if (revealedInfo.includes('alternate_pronunciations') && word.alternate_pronunciations) {
+                            badges += `<div class="${smallClass}">🔊 ${word.alternate_pronunciations}</div>`;
+                        }
+                        if (badges) revInfo.innerHTML += `<div>${badges}</div>`;
+                    }
+                    switchView('spelling');
+                    break;
+
+                case 'result':
+                    const rTitle = document.getElementById('result-title');
+                    const rSub = document.getElementById('result-subtitle');
+                    const confetti = document.getElementById('result-confetti');
+
+                    confetti.classList.add('hidden');
+                    rSub.textContent = '';
+                    // Reset bg classes
+                    views.result.className = 'w-full h-full flex flex-col justify-center items-center fade-in transition-colors duration-300';
+
+                    if (s.result === 'correct') {
+                        views.result.classList.add('bg-green-900/80');
+                        rTitle.textContent = '✓ CORRECT';
+                        rTitle.className = 'text-9xl font-serif font-black mb-8 text-green-300 glow';
+                        createConfetti();
+                        confetti.classList.remove('hidden');
+                    } else if (s.result === 'incorrect') {
+                        views.result.classList.add('bg-red-900/80');
+                        rTitle.textContent = '✗ INCORRECT';
+                        rTitle.className = 'text-9xl font-serif font-black mb-8 text-red-300 shake';
+                        if (word) rSub.textContent = word.word;
+                    } else if (s.result === 'timeout') {
+                        views.result.classList.add('bg-orange-900/80');
+                        rTitle.textContent = "⏰ TIME'S UP";
+                        rTitle.className = 'text-9xl font-serif font-black mb-8 text-orange-300 shake';
+                        if (word) rSub.textContent = word.word;
+                    }
+                    switchView('result');
+                    break;
+
+                case 'scoreboard':
+                    const scoreboard = msg.scoreboard || [];
+                    const sbList = document.getElementById('scoreboard-list');
+                    sbList.innerHTML = scoreboard.map(p => {
+                        const isElim = p.eliminated;
+                        const total = p.total_correct + p.total_incorrect + p.total_timeout;
+                        const rowClass = `grid grid-cols-4 gap-4 text-3xl py-4 items-center border-b border-gray-800 ${isElim ? 'opacity-40 line-through' : ''}`;
+                        return `
+                        <div class="${rowClass}">
+                            <div class="col-span-2 font-bold">${p.player_name}</div>
+                            <div class="text-center font-mono">${p.total_correct} / ${total}</div>
+                            <div class="text-right text-xl uppercase tracking-wider">${isElim ? `Eliminated R${p.rounds_survived}` : 'Active'}</div>
+                        </div>`;
+                    }).join('');
+                    switchView('scoreboard');
+                    break;
+            }
+
+            lastDisplayMode = s.display_mode;
+            lastResult = s.result;
+        }
+
+        function updateTimer() {
+            const s = state;
+            if (s.display_mode === 'spelling' && s.timer_duration > 0) {
+                dom.timerContainer.classList.remove('hidden');
+
+                const remaining = s.timer_seconds_remaining || 0;
+                const duration = s.timer_duration || 120;
+                const pct = duration > 0 ? (remaining / duration) * 100 : 0;
+
+                dom.timerBar.style.width = `${pct}%`;
+
+                let colorClass = 'bg-green-500 shadow-[0_0_15px_rgba(74,222,128,0.5)]';
+                if (remaining <= 30) colorClass = 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]';
+                else if (remaining <= 45) colorClass = 'bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.5)]';
+
+                dom.timerBar.className = `h-full transition-all duration-1000 ${colorClass}`;
+
+                if (remaining <= 30) {
+                    dom.timerText.textContent = Math.ceil(remaining);
+                } else {
+                    dom.timerText.textContent = '';
+                }
+
+                if (!s.timer_running && remaining > 0 && remaining < duration) {
+                    dom.timerPaused.classList.remove('hidden');
+                } else {
+                    dom.timerPaused.classList.add('hidden');
+                }
+            } else {
+                dom.timerContainer.classList.add('hidden');
+            }
+        }
+
+        function createConfetti() {
+            const container = document.getElementById('result-confetti');
+            container.innerHTML = '';
+            const colors = ['#4ade80', '#fbbf24', '#60a5fa', '#f87171', '#a78bfa', '#fb923c'];
+            for (let i = 0; i < 80; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                p.style.left = Math.random() * 100 + '%';
+                p.style.top = '-10px';
+                p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                p.style.width = (Math.random() * 8 + 6) + 'px';
+                p.style.height = (Math.random() * 8 + 6) + 'px';
+
+                const duration = Math.random() * 3 + 2;
+                const delay = Math.random() * 0.5;
+
+                p.animate([
+                    { transform: 'translate3d(0,0,0) rotate(0deg)', opacity: 1 },
+                    { transform: `translate3d(${Math.random() * 200 - 100}px, 100vh, 0) rotate(${Math.random() * 720}deg)`, opacity: 0 }
+                ], {
+                    duration: duration * 1000,
+                    delay: delay * 1000,
+                    easing: 'cubic-bezier(.37,0,.63,1)',
+                    fill: 'forwards'
+                });
+                container.appendChild(p);
+            }
+        }
+    </script>
+</body>
+</html>

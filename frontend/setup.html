@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐝 Spelling Bee - Setup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-gray-900 text-white p-4 shadow-md">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold font-[Playfair_Display]">🐝 Spelling Bee</h1>
+            <div class="space-x-4">
+                <a href="/static/setup.html" class="font-semibold text-yellow-400">Setup</a>
+                <a href="/static/control.html" class="hover:text-yellow-400">Control</a>
+                <a href="/static/display.html" class="hover:text-yellow-400">Display</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Session Management -->
+        <div class="col-span-1 bg-white p-6 rounded-lg shadow">
+            <h2 class="text-xl font-bold mb-4">Sessions</h2>
+            <button id="btn-new-session" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 mb-4">+ New Session</button>
+            
+            <div id="new-session-form" class="hidden bg-gray-50 p-4 rounded mb-4 border">
+                <input type="text" id="session-name" placeholder="Session Name" class="w-full p-2 border rounded mb-2">
+                <label class="block text-sm mb-1">Timer Duration (s): <span id="timer-val">120</span></label>
+                <input type="range" id="session-timer" min="30" max="300" value="120" class="w-full mb-2">
+                <label class="flex items-center mb-4">
+                    <input type="checkbox" id="session-elimination" class="mr-2" checked>
+                    Elimination Mode
+                </label>
+                <div class="flex space-x-2">
+                    <button id="btn-create-session" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Create</button>
+                    <button id="btn-cancel-session" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
+                </div>
+            </div>
+
+            <div id="session-list" class="space-y-2"></div>
+        </div>
+
+        <!-- Players & Words Panels -->
+        <div class="col-span-1 md:col-span-2 space-y-6 hidden" id="session-details">
+            <!-- Players -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Players</h2>
+                    <button id="btn-add-player" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">+ Add Player</button>
+                </div>
+
+                <div id="new-player-form" class="hidden bg-gray-50 p-4 rounded mb-4 border grid grid-cols-2 gap-2">
+                    <input type="text" id="player-name" placeholder="Name (Required)" class="col-span-2 p-2 border rounded">
+                    <input type="number" id="player-age" placeholder="Age" class="p-2 border rounded">
+                    <input type="text" id="player-grade" placeholder="Grade" class="p-2 border rounded">
+                    <input type="text" id="player-school" placeholder="School" class="col-span-2 p-2 border rounded">
+                    <input type="text" id="player-fun-fact" placeholder="Fun Fact" class="col-span-2 p-2 border rounded">
+                    <div class="col-span-2 flex space-x-2 mt-2">
+                        <button id="btn-save-player" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Save</button>
+                        <button id="btn-cancel-player" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
+                    </div>
+                </div>
+
+                <div id="player-list" class="space-y-2"></div>
+            </div>
+
+            <!-- Words -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Words</h2>
+                    <div class="space-x-2">
+                        <button id="btn-add-word" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">+ Add Word</button>
+                        <button id="btn-import-words" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">Bulk Import</button>
+                    </div>
+                </div>
+
+                <!-- Bulk Import Modal inline -->
+                <div id="import-words-form" class="hidden bg-gray-50 p-4 rounded mb-4 border">
+                    <p class="text-sm mb-2 text-gray-600">Paste JSON array of words. E.g.: <code>[{"word": "apple", "definition": "fruit", "difficulty": 1, "player_name": "Alice"}]</code></p>
+                    <textarea id="import-json" rows="5" class="w-full p-2 border rounded font-mono text-sm mb-2"></textarea>
+                    <div class="flex space-x-2">
+                        <button id="btn-save-import" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Import</button>
+                        <button id="btn-cancel-import" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- Add Word Form -->
+                <div id="new-word-form" class="hidden bg-gray-50 p-4 rounded mb-4 border grid grid-cols-2 gap-2">
+                    <input type="text" id="word-text" placeholder="Word (Required)" class="col-span-2 p-2 border rounded">
+                    <input type="text" id="word-def" placeholder="Definition" class="col-span-2 p-2 border rounded">
+                    <input type="text" id="word-sentence" placeholder="Sentence" class="col-span-2 p-2 border rounded">
+                    <input type="text" id="word-pos" placeholder="Part of Speech" class="p-2 border rounded">
+                    <input type="text" id="word-origin" placeholder="Origin" class="p-2 border rounded">
+                    <input type="text" id="word-alt" placeholder="Alt. Pronunciations" class="col-span-2 p-2 border rounded">
+                    <select id="word-difficulty" class="p-2 border rounded">
+                        <option value="1">Difficulty 1</option>
+                        <option value="2">Difficulty 2</option>
+                        <option value="3">Difficulty 3</option>
+                        <option value="4">Difficulty 4</option>
+                        <option value="5">Difficulty 5</option>
+                    </select>
+                    <select id="word-player" class="p-2 border rounded">
+                        <option value="">-- Pool (No Player) --</option>
+                    </select>
+                    <div class="col-span-2 flex space-x-2 mt-2">
+                        <button id="btn-save-word" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Save</button>
+                        <button id="btn-cancel-word" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- Word List Filters -->
+                <div class="flex border-b mb-4 overflow-x-auto" id="word-tabs">
+                    <button class="px-4 py-2 border-b-2 border-blue-600 font-semibold" data-tab="all">All Words</button>
+                    <button class="px-4 py-2 text-gray-500 hover:text-gray-700" data-tab="pool">Session Pool</button>
+                </div>
+
+                <div id="word-list" class="space-y-2 max-h-[500px] overflow-y-auto"></div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import * as api from './js/api.js';
+
+        let currentSession = null;
+        let players = [];
+        let words = [];
+        let activeTab = 'all';
+
+        const dom = {
+            sessionList: document.getElementById('session-list'),
+            sessionDetails: document.getElementById('session-details'),
+            playerList: document.getElementById('player-list'),
+            wordList: document.getElementById('word-list'),
+            wordPlayerSelect: document.getElementById('word-player'),
+            wordTabs: document.getElementById('word-tabs'),
+            timerVal: document.getElementById('timer-val'),
+            sessionTimer: document.getElementById('session-timer')
+        };
+
+        dom.sessionTimer.addEventListener('input', e => dom.timerVal.textContent = e.target.value);
+
+        // Forms toggles
+        const toggleForm = (formId, show) => {
+            document.getElementById(formId).classList.toggle('hidden', !show);
+        };
+        
+        document.getElementById('btn-new-session').onclick = () => toggleForm('new-session-form', true);
+        document.getElementById('btn-cancel-session').onclick = () => toggleForm('new-session-form', false);
+        document.getElementById('btn-add-player').onclick = () => toggleForm('new-player-form', true);
+        document.getElementById('btn-cancel-player').onclick = () => toggleForm('new-player-form', false);
+        document.getElementById('btn-add-word').onclick = () => toggleForm('new-word-form', true);
+        document.getElementById('btn-cancel-word').onclick = () => toggleForm('new-word-form', false);
+        document.getElementById('btn-import-words').onclick = () => toggleForm('import-words-form', true);
+        document.getElementById('btn-cancel-import').onclick = () => toggleForm('import-words-form', false);
+
+        async function loadSessions() {
+            try {
+                const sessions = await api.fetchSessions();
+                dom.sessionList.innerHTML = sessions.map(s => `
+                    <div class="p-3 border rounded cursor-pointer hover:bg-blue-50 flex justify-between items-center ${currentSession?.id === s.id ? 'bg-blue-100 border-blue-400' : ''}" onclick="window.selectSession('${s.id}')">
+                        <div>
+                            <div class="font-bold">${s.name}</div>
+                            <div class="text-xs text-gray-500">Players: ${s.players?.length || 0} | Words: ${s.words?.length || 0}</div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="event.stopPropagation(); window.resetSess('${s.id}')" class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">Reset</button>
+                            <button onclick="event.stopPropagation(); window.deleteSess('${s.id}')" class="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">Del</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) { console.error(e); }
+        }
+
+        window.selectSession = async (id) => {
+            currentSession = await api.getSession(id);
+            dom.sessionDetails.classList.remove('hidden');
+            loadSessions(); // to update active state
+            await loadSessionData();
+        };
+
+        window.deleteSess = async (id) => {
+            if(confirm('Delete this session?')) {
+                await api.deleteSession(id);
+                if(currentSession?.id === id) {
+                    currentSession = null;
+                    dom.sessionDetails.classList.add('hidden');
+                }
+                loadSessions();
+            }
+        };
+
+        window.resetSess = async (id) => {
+            if(confirm('Reset session progress?')) {
+                await api.resetSession(id);
+                if(currentSession?.id === id) await loadSessionData();
+            }
+        };
+
+        document.getElementById('btn-create-session').onclick = async () => {
+            const name = document.getElementById('session-name').value;
+            if(!name) return alert('Name required');
+            await api.createSession({
+                name,
+                timer_duration_seconds: parseInt(document.getElementById('session-timer').value),
+                elimination_mode: document.getElementById('session-elimination').checked
+            });
+            toggleForm('new-session-form', false);
+            loadSessions();
+        };
+
+        async function loadSessionData() {
+            if (!currentSession) return;
+            players = await api.fetchPlayers(currentSession.id);
+            words = await api.fetchWords(currentSession.id);
+            renderPlayers();
+            renderWordTabs();
+            renderWords();
+            updatePlayerDropdown();
+        }
+
+        function renderPlayers() {
+            dom.playerList.innerHTML = players.map(p => `
+                <div class="p-3 border rounded bg-white shadow-sm flex justify-between items-center">
+                    <div>
+                        <div class="font-bold">${p.name} ${p.eliminated ? '<span class="text-red-500 text-xs">(Eliminated)</span>' : ''}</div>
+                        <div class="text-xs text-gray-500">${p.grade || ''} ${p.school ? '- ' + p.school : ''}</div>
+                    </div>
+                    <button onclick="window.deletePlayer('${p.id}')" class="text-red-500 hover:text-red-700">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        window.deletePlayer = async (id) => {
+            if(confirm('Delete player?')) {
+                await api.deletePlayer(currentSession.id, id);
+                loadSessionData();
+            }
+        };
+
+        document.getElementById('btn-save-player').onclick = async () => {
+            const name = document.getElementById('player-name').value;
+            if(!name) return alert('Name required');
+            await api.createPlayer(currentSession.id, {
+                name,
+                age: document.getElementById('player-age').value || null,
+                grade: document.getElementById('player-grade').value,
+                school: document.getElementById('player-school').value,
+                fun_fact: document.getElementById('player-fun-fact').value
+            });
+            toggleForm('new-player-form', false);
+            loadSessionData();
+        };
+
+        function updatePlayerDropdown() {
+            dom.wordPlayerSelect.innerHTML = `<option value="">-- Pool (No Player) --</option>` + 
+                players.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+        }
+
+        function renderWordTabs() {
+            dom.wordTabs.innerHTML = `
+                <button class="px-4 py-2 border-b-2 ${activeTab === 'all' ? 'border-blue-600 font-semibold' : 'text-gray-500 border-transparent'} hover:text-gray-700 whitespace-nowrap" onclick="window.setTab('all')">All Words</button>
+                <button class="px-4 py-2 border-b-2 ${activeTab === 'pool' ? 'border-blue-600 font-semibold' : 'text-gray-500 border-transparent'} hover:text-gray-700 whitespace-nowrap" onclick="window.setTab('pool')">Session Pool</button>
+            ` + players.map(p => `
+                <button class="px-4 py-2 border-b-2 ${activeTab === p.id ? 'border-blue-600 font-semibold' : 'text-gray-500 border-transparent'} hover:text-gray-700 whitespace-nowrap" onclick="window.setTab('${p.id}')">${p.name}</button>
+            `).join('');
+        }
+
+        window.setTab = (tab) => {
+            activeTab = tab;
+            renderWordTabs();
+            renderWords();
+        };
+
+        function renderWords() {
+            const filtered = words.filter(w => {
+                if (activeTab === 'all') return true;
+                if (activeTab === 'pool') return !w.player_id;
+                return w.player_id === activeTab;
+            });
+
+            dom.wordList.innerHTML = filtered.map(w => {
+                const p = players.find(pl => pl.id === w.player_id);
+                return `
+                <div class="p-3 border rounded bg-white shadow-sm flex justify-between items-center ${w.used ? 'opacity-50' : ''}">
+                    <div>
+                        <div class="font-bold flex items-center gap-2">
+                            ${w.word} 
+                            <span class="text-yellow-500 text-xs">${'★'.repeat(w.difficulty || 0)}</span>
+                            ${w.used ? '<span class="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded">Used</span>' : ''}
+                        </div>
+                        <div class="text-xs text-gray-500 truncate max-w-md">${w.definition || 'No definition'}</div>
+                        <div class="text-xs font-semibold text-blue-600 mt-1">${p ? p.name : 'Pool'}</div>
+                    </div>
+                    <button onclick="window.deleteWord('${w.id}')" class="text-red-500 hover:text-red-700">Del</button>
+                </div>
+            `}).join('');
+        }
+
+        window.deleteWord = async (id) => {
+            if(confirm('Delete word?')) {
+                await api.deleteWord(currentSession.id, id);
+                loadSessionData();
+            }
+        };
+
+        document.getElementById('btn-save-word').onclick = async () => {
+            const word = document.getElementById('word-text').value;
+            if(!word) return alert('Word required');
+            await api.createWord(currentSession.id, {
+                word,
+                definition: document.getElementById('word-def').value,
+                sentence: document.getElementById('word-sentence').value,
+                part_of_speech: document.getElementById('word-pos').value,
+                language_of_origin: document.getElementById('word-origin').value,
+                alternate_pronunciations: document.getElementById('word-alt').value,
+                difficulty: parseInt(document.getElementById('word-difficulty').value),
+                player_id: document.getElementById('word-player').value || null
+            });
+            toggleForm('new-word-form', false);
+            loadSessionData();
+        };
+
+        document.getElementById('btn-save-import').onclick = async () => {
+            try {
+                const json = JSON.parse(document.getElementById('import-json').value);
+                await api.bulkImportWords(currentSession.id, json);
+                toggleForm('import-words-form', false);
+                document.getElementById('import-json').value = '';
+                loadSessionData();
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        };
+
+        // Init
+        loadSessions();
+    </script>
+</body>
+</html>
