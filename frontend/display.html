@@ -159,9 +159,8 @@
 
         dom.clickToStart.onclick = async () => {
             dom.clickToStart.classList.add('hidden');
-            sounds.initAudio();
-            sounds.playBeeps(1); // audible confirmation that sound works on this TV
-            watchSound();
+            // Unlock audio, then play one beep as an audible check and show/hide the "Sound is off" button
+            sounds.initAudio().then(() => { sounds.playBeeps(1); watchSound(); });
             // Speech synthesis needs a user gesture before it will play; prime it here
             if ('speechSynthesis' in window) window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
 
@@ -211,7 +210,9 @@
             update();
             setInterval(update, 2000);
         }
-        soundOff.onclick = () => { sounds.initAudio(); sounds.playBeeps(1); setTimeout(() => soundOff.classList.toggle('hidden', sounds.audioState() === 'running'), 300); };
+        soundOff.onclick = () => {
+            sounds.initAudio().then(() => { sounds.playBeeps(1); soundOff.classList.toggle('hidden', sounds.audioState() === 'running'); });
+        };
 
         function handlePronounce({ word, rate }) {
             speak(word, rate || 0.8);
