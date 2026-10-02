@@ -73,7 +73,7 @@ Then go back to step 1. Teams or players who have already gone this round get a 
 
 **Fixing an older score:** every word that has been judged shows its round, result and who spelled it, e.g. **R1 · ❌ Red**. Tap the **⋯** next to it to move it to another round, change it to ✅ Correct / ❌ Incorrect / ⏰ Timeout, or **Remove score** (the word goes back to unused). Then tap **Save**. Scores, eliminations and round progress update to match.
 
-> **Hiding the word:** by default the spelling screen shows the whole word in large text for the audience. Tap **👁 TV: showing the whole word** on the controller to switch to **🙈 TV: first letter + definition only**, so spellers can face the TV. The phone remembers the choice, and the TV shows the full word again on the result screen.
+> **Hiding the word:** by default the spelling screen shows the whole word in large text for the audience. Tap **👁 Showing whole words on TV + phone** on the controller to switch to **🙈 Hiding words (TV + phone)**. Both the TV and the judge's phone then show only the first letter (the rest blurred) and the definition, so spellers can face the TV and nobody can read the phone over the judge's shoulder. To see the words on the phone, press and hold **👁 Hold to peek at words**; they hide again when you let go. The phone remembers the choice, and the TV shows the full word again on the result screen.
 
 ### 4. Between rounds and at the end
 

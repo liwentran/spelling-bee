@@ -61,6 +61,8 @@
             <div id="word-list" class="h-48 overflow-y-auto bg-gray-800 rounded-lg p-2 space-y-2 border border-gray-700">
                 <div class="text-center text-gray-500 py-4">Select a player first</div>
             </div>
+            <!-- Words are masked while hiding is on; holding this shows them -->
+            <button id="btn-peek" class="hidden w-full mt-2 bg-gray-800 border border-gray-600 py-3 rounded-lg font-semibold select-none active:bg-gray-600" style="touch-action: none; -webkit-touch-callout: none;">👁 Hold to peek at words</button>
         </div>
 
         <!-- What the TV shows of the word: all of it, or only the first letter + definition -->
@@ -148,6 +150,7 @@
         // Hide the word on the TV (first letter + definition only). Saved on this phone and
         // re-sent whenever the server disagrees, so a server restart doesn't reveal words.
         let hideWord = false;
+        let peeking = false; // holding "Hold to peek" shows the words on this phone
         try { hideWord = localStorage.getItem('hideWord') === '1'; } catch (e) {}
         let lastDataVersion = null;
         let latestWinner = null; // elimination winner, sent with result/scoreboard broadcasts
@@ -288,9 +291,7 @@
                 btn.disabled = !owner || !s.current_word_id || !!s.result;
                 btn.classList.toggle('opacity-30', btn.disabled);
             });
-            const lt = s.last_turn;
-            dom.undo.classList.toggle('hidden', !lt);
-            if (lt) dom.undo.textContent = `↩ Undo ${RESULT_LABEL[lt.result] || lt.result} · ${lt.name || ''} · "${lt.word || ''}"`;
+            renderUndo();
 
             // Timer ticks arrive every second; only rebuild the lists when something else changed
             const { timer_running, timer_seconds_remaining, timer_duration, ...listState } = s;
@@ -303,6 +304,28 @@
             }
         }
         let lastListKey = null;
+        function renderUndo() {
+            const lt = state.last_turn;
+            dom.undo.classList.toggle('hidden', !lt);
+            if (lt) dom.undo.innerHTML = `↩ Undo ${RESULT_LABEL[lt.result] || lt.result} · ${esc(lt.name)} · "${maskWord(lt.word)}"`;
+        }
+
+        // With hiding on, the phone shows words like the TV does: first letter + blurred dots (unless peeking)
+        const esc = (str) => String(str ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+        function maskWord(word) {
+            word = String(word ?? '');
+            if (!hideWord || peeking || !word) return esc(word);
+            return `${esc(word.charAt(0))}<span class="select-none opacity-60" style="filter: blur(3px)" aria-hidden="true">${'•'.repeat(word.length - 1)}</span>`;
+        }
+        const plainMask = (word) => hideWord && !peeking ? `${String(word).charAt(0)}…` : word; // for confirm() text
+
+        // Re-draw everything that shows a word (after toggling hiding or peeking)
+        function renderWordText() {
+            document.getElementById('btn-peek').classList.toggle('hidden', !hideWord);
+            renderWords();
+            renderUndo();
+            renderTurnMenu();
+        }
         const RESULT_LABEL = { correct: '✅ Correct', incorrect: '❌ Incorrect', timeout: '⏰ Timeout' };
 
         async function refreshData() {
@@ -484,7 +507,7 @@
                 return `
                 <div onclick="window.selectWord('${w.id}')" class="${classes}">
                     <div>
-                        <div class="font-bold text-lg">${w.word} <span class="text-yellow-500 text-sm">${stars}</span></div>
+                        <div class="font-bold text-lg">${maskWord(w.word)} <span class="text-yellow-500 text-sm">${stars}</span></div>
                         <div class="text-xs opacity-70 truncate max-w-[200px]">${w.definition || ''}</div>
                         ${p ? `<div class="text-xs text-blue-400">${p.name}</div>` : ''}
                         ${team ? `<div class="text-xs" style="color: ${teamColor(team.color)}">Team ${team.name}</div>` : ''}
@@ -524,7 +547,7 @@
             window.closeTurnMenu();
         };
         window.removeTurnScore = () => {
-            if (!confirm(`Remove the score for "${turnDraft.word}"? The word goes back to unused.`)) return;
+            if (!confirm(`Remove the score for "${plainMask(turnDraft.word)}"? The word goes back to unused.`)) return;
             ws.deleteTurn(turnDraft.id);
             window.closeTurnMenu();
         };
@@ -538,7 +561,7 @@
             el.innerHTML = `
             <div onclick="event.stopPropagation()" class="w-full bg-gray-900 border-t border-gray-600 rounded-t-2xl p-5 space-y-5">
                 <div>
-                    <div class="text-2xl font-bold">${d.word}</div>
+                    <div class="text-2xl font-bold">${maskWord(d.word)}</div>
                     <div class="text-sm text-gray-400">${d.owner}</div>
                 </div>
                 <div class="flex items-center justify-between">
@@ -638,7 +661,7 @@
         document.getElementById('btn-pronounce-3x').onclick = () => ws.pronounceWord(PRONOUNCE_RATE / 3);
         const hideBtn = document.getElementById('btn-hide-word');
         const renderHideBtn = () => {
-            hideBtn.textContent = hideWord ? '🙈 TV: first letter + definition only' : '👁 TV: showing the whole word';
+            hideBtn.textContent = hideWord ? '🙈 Hiding words (TV + phone): first letter + definition' : '👁 Showing whole words on TV + phone';
             hideBtn.classList.toggle('border-yellow-500', hideWord);
             hideBtn.classList.toggle('text-yellow-300', hideWord);
         };
@@ -646,9 +669,16 @@
             hideWord = !hideWord;
             try { localStorage.setItem('hideWord', hideWord ? '1' : '0'); } catch (e) {}
             renderHideBtn();
+            renderWordText();
             ws.setHideWord(hideWord);
         };
         renderHideBtn();
+        document.getElementById('btn-peek').classList.toggle('hidden', !hideWord);
+        const peekBtn = document.getElementById('btn-peek');
+        const setPeek = (on) => { if (peeking === on) return; peeking = on; peekBtn.textContent = on ? '👁 Showing words: let go to hide' : '👁 Hold to peek at words'; renderWordText(); };
+        peekBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); setPeek(true); });
+        ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => peekBtn.addEventListener(ev, () => setPeek(false)));
+        peekBtn.addEventListener('contextmenu', (e) => e.preventDefault()); // long-press menu on phones
         document.getElementById('btn-scoreboard').onclick = ws.showScoreboard;
         document.getElementById('btn-next-round').onclick = () => {
             const isTeam = gameMode === 'team';
