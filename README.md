@@ -101,7 +101,7 @@ A **round** is one word for each team (or player) still in the game. When everyo
 
 ## Deployment
 
-Deployed at **http://143.244.162.12:8003/** on a DigitalOcean droplet shared with other apps. It runs in the `spelling-bee-backend` container, built from `~/spelling-bee` on the droplet.
+Deployed at **https://bee.liwentran.com/** on a DigitalOcean droplet shared with other apps. Caddy serves the domain over https and proxies it to port 8003; `http://143.244.162.12:8003/` also still works, but share the https link, because some networks block port 8003 and some browsers refuse plain http. It runs in the `spelling-bee-backend` container, built from `~/spelling-bee` on the droplet.
 
 ```bash
 git push origin main   # make deploy refuses if the tree is dirty or unpushed

@@ -47,7 +47,7 @@ The DB is Postgres on a remote droplet (`general-db`), reached through an SSH tu
 
 ## Droplet & deployment
 
-The app is deployed at **http://143.244.162.12:8003/**, with no domain and no HTTPS. The droplet is shared with other apps, so **never touch their containers, directories, databases, Caddy config, or cron.**
+The app is deployed at **https://bee.liwentran.com/**. Caddy terminates TLS (with an automatic Let's Encrypt certificate) and proxies to `localhost:8003`, and WebSockets run over `wss://`. The raw `http://143.244.162.12:8003/` still answers, but always share the https URL: some networks block :8003 and some browsers force https. The droplet is shared with other apps, so **never touch their containers, directories, databases, Caddy config, or cron.**
 
 - SSH alias `droplet` (`root@143.244.162.12`, in `~/.ssh/config`). The box is tiny: 458 MB RAM, swap in use, about 2.8 GB disk free. Keep images slim and avoid running builds you don't need.
 - Use `docker-compose` (v5, hyphenated). `docker compose` isn't installed.
@@ -59,9 +59,11 @@ The app is deployed at **http://143.244.162.12:8003/**, with no domain and no HT
 | 8000 | `cafe-backend` | `~/cafe` | cafe | GitHub Actions → Docker Hub `liwentran/cafe-backend` → ssh restart |
 | 8001 | `beli-api` | `~/beli-scraper` | beli_scraper | compose build on box |
 | 8002 | `budgeting-backend` | `~/budgeting-app` | budgetapp | git clone + compose build on box |
-| 8003 | `spelling-bee-backend` | `~/spelling-bee` | spellingbee | git clone + compose build on box (this repo) |
+| 8003 (`bee.liwentran.com` via Caddy) | `spelling-bee-backend` | `~/spelling-bee` | spellingbee | git clone + compose build on box (this repo) |
 
-- Caddy (`/etc/caddy/Caddyfile`) proxies `api.liwentran.com` → :8000 and `eats.liwentran.com` → :8001. Spelling bee isn't behind Caddy. If it ever gets a domain, add a block there; Caddy proxies WebSockets automatically, and `ws.js` switches to `wss:` under https.
+- Caddy (`/etc/caddy/Caddyfile`) proxies `api.liwentran.com` → :8000, `eats.liwentran.com` → :8001 and `bee.liwentran.com` → :8003. It proxies WebSockets automatically, and `ws.js` switches to `wss:` under https.
+  - To change it, back up the file (`Caddyfile.bak-<date>` sits next to it), edit only this app's block, run `caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`, then `systemctl reload caddy`. The reload is graceful, so other sites stay up.
+  - DNS for liwentran.com is at Squarespace Domains (formerly Google Domains). `bee` is an A record → 143.244.162.12.
 - `general-db` doesn't publish 5432. Locally you reach it through the tunnel `ssh -L 5433:172.18.0.3:5432 droplet` (`make tunnel`).
 - Backups: root cron runs `/root/cafe/backup_db.sh` at 3:00 AM. It dumps **every database** in `general-db` (`<db>_db_<ts>.dump`, plus `globals_<ts>.sql` for roles) to `/root/cafe/backups` (kept 7 days) and `gs://liwentran.com/db_backups/` (console: https://console.cloud.google.com/storage/browser/liwentran.com/db_backups). The script's source copy is `~/Developer/wyomb-cafe/backup_db.sh`, which isn't tracked in git.
 - The wyomb-cafe repo (`~/Developer/wyomb-cafe`) is the cafe app: FastAPI + SvelteKit, with its frontend on Vercel at coffee.liwentran.com.

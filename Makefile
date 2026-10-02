@@ -32,7 +32,7 @@ down:
 	@pkill -f "uvicorn main:app --host 0.0.0.0 --port 8003" || true
 	@echo "Stopped backend."
 
-# --- Droplet deployment (http://143.244.162.12:8003) ---
+# --- Droplet deployment (https://bee.liwentran.com → Caddy → :8003) ---
 # Only ever touches the spelling-bee-backend container; other apps share this droplet.
 
 deploy:
@@ -41,7 +41,7 @@ deploy:
 	@[ "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" ] || (echo "❌ HEAD is not origin/main. Push first."; exit 1)
 	@echo "🚀 Deploying $$(git rev-parse --short HEAD) to droplet..."
 	ssh droplet 'cd ~/spelling-bee && git pull --ff-only && docker-compose up -d --build --no-deps spelling-bee-backend'
-	@echo "✅ Deployed: http://143.244.162.12:8003/"
+	@echo "✅ Deployed: https://bee.liwentran.com/"
 
 logs:
 	ssh -t droplet "docker logs --tail=100 -f spelling-bee-backend"
