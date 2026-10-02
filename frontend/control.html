@@ -65,8 +65,15 @@
             <button id="btn-peek" class="hidden w-full mt-2 bg-gray-800 border border-gray-600 py-3 rounded-lg font-semibold select-none active:bg-gray-600" style="touch-action: none; -webkit-touch-callout: none;">👁 Hold to peek at words</button>
         </div>
 
-        <!-- What the TV shows of the word: all of it, or only the first letter + definition -->
-        <button id="btn-hide-word" class="w-full bg-gray-800 border border-gray-600 py-3 rounded-xl text-lg font-semibold active:scale-95 transition-transform"></button>
+        <!-- Where the word is shown in full: everywhere, TV only (default), or nowhere (first letter + definition) -->
+        <div>
+            <h3 class="text-sm text-gray-400 mb-2 uppercase tracking-wide">Show the word</h3>
+            <div id="word-visibility" class="grid grid-cols-3 gap-2 text-sm">
+                <button data-mode="show" class="vis-btn bg-gray-800 border border-gray-600 py-2 px-1 rounded-lg font-semibold active:scale-95 transition-transform">👁 Show<br><span class="text-xs font-normal opacity-70">TV + phone</span></button>
+                <button data-mode="phone" class="vis-btn bg-gray-800 border border-gray-600 py-2 px-1 rounded-lg font-semibold active:scale-95 transition-transform">📱 Hide on phone<br><span class="text-xs font-normal opacity-70">TV shows it</span></button>
+                <button data-mode="both" class="vis-btn bg-gray-800 border border-gray-600 py-2 px-1 rounded-lg font-semibold active:scale-95 transition-transform">🙈 Hide on both<br><span class="text-xs font-normal opacity-70">first letter only</span></button>
+            </div>
+        </div>
 
         <!-- Pronounce -->
         <div class="space-y-2">
@@ -149,9 +156,17 @@
         let selectedTeamId = null; // team mode only
         // Hide the word on the TV (first letter + definition only). Saved on this phone and
         // re-sent whenever the server disagrees, so a server restart doesn't reveal words.
-        let hideWord = false;
+        // wordVisibility: 'show' (whole word on TV + phone), 'phone' (default: masked on this phone,
+        // whole on the TV), 'both' (masked on both; TV shows first letter + definition).
+        let wordVisibility = 'phone';
         let peeking = false; // holding "Hold to peek" shows the words on this phone
-        try { hideWord = localStorage.getItem('hideWord') === '1'; } catch (e) {}
+        try {
+            const saved = localStorage.getItem('wordVisibility');
+            if (['show', 'phone', 'both'].includes(saved)) wordVisibility = saved;
+            else if (localStorage.getItem('hideWord') === '1') wordVisibility = 'both'; // older on/off setting
+        } catch (e) {}
+        const hideOnPhone = () => wordVisibility !== 'show';
+        const hideOnTv = () => wordVisibility === 'both';
         let lastDataVersion = null;
         let latestWinner = null; // elimination winner, sent with result/scoreboard broadcasts
         let wordTab = 'player'; // player (or team's, in team mode), pool, all
@@ -282,7 +297,7 @@
             });
 
             document.querySelectorAll('.pronounce-btn').forEach(btn => { btn.disabled = !s.current_word_id; });
-            if (!!s.hide_word !== hideWord) ws.setHideWord(hideWord);
+            if (!!s.hide_word !== hideOnTv()) ws.setHideWord(hideOnTv());
 
             // Judge once per word; Undo reopens it
             const owner = gameMode === 'team' ? s.current_team_id : s.current_player_id;
@@ -314,14 +329,14 @@
         const esc = (str) => String(str ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
         function maskWord(word) {
             word = String(word ?? '');
-            if (!hideWord || peeking || !word) return esc(word);
+            if (!hideOnPhone() || peeking || !word) return esc(word);
             return `${esc(word.charAt(0))}<span class="select-none opacity-60" style="filter: blur(3px)" aria-hidden="true">${'•'.repeat(word.length - 1)}</span>`;
         }
-        const plainMask = (word) => hideWord && !peeking ? `${String(word).charAt(0)}…` : word; // for confirm() text
+        const plainMask = (word) => hideOnPhone() && !peeking ? `${String(word).charAt(0)}…` : word; // for confirm() text
 
         // Re-draw everything that shows a word (after toggling hiding or peeking)
         function renderWordText() {
-            document.getElementById('btn-peek').classList.toggle('hidden', !hideWord);
+            document.getElementById('btn-peek').classList.toggle('hidden', !hideOnPhone());
             renderWords();
             renderUndo();
             renderTurnMenu();
@@ -659,21 +674,23 @@
         document.getElementById('btn-pronounce').onclick = () => ws.pronounceWord(PRONOUNCE_RATE);
         document.getElementById('btn-pronounce-2x').onclick = () => ws.pronounceWord(PRONOUNCE_RATE / 2);
         document.getElementById('btn-pronounce-3x').onclick = () => ws.pronounceWord(PRONOUNCE_RATE / 3);
-        const hideBtn = document.getElementById('btn-hide-word');
-        const renderHideBtn = () => {
-            hideBtn.textContent = hideWord ? '🙈 Hiding words (TV + phone): first letter + definition' : '👁 Showing whole words on TV + phone';
-            hideBtn.classList.toggle('border-yellow-500', hideWord);
-            hideBtn.classList.toggle('text-yellow-300', hideWord);
-        };
-        hideBtn.onclick = () => {
-            hideWord = !hideWord;
-            try { localStorage.setItem('hideWord', hideWord ? '1' : '0'); } catch (e) {}
-            renderHideBtn();
+        const visButtons = document.querySelectorAll('.vis-btn');
+        const renderVisButtons = () => visButtons.forEach(btn => {
+            const on = btn.dataset.mode === wordVisibility;
+            btn.classList.toggle('border-yellow-500', on);
+            btn.classList.toggle('text-yellow-300', on);
+            btn.classList.toggle('bg-gray-700', on);
+            btn.classList.toggle('border-gray-600', !on);
+        });
+        visButtons.forEach(btn => btn.onclick = () => {
+            wordVisibility = btn.dataset.mode;
+            try { localStorage.setItem('wordVisibility', wordVisibility); } catch (e) {}
+            renderVisButtons();
             renderWordText();
-            ws.setHideWord(hideWord);
-        };
-        renderHideBtn();
-        document.getElementById('btn-peek').classList.toggle('hidden', !hideWord);
+            ws.setHideWord(hideOnTv());
+        });
+        renderVisButtons();
+        document.getElementById('btn-peek').classList.toggle('hidden', !hideOnPhone());
         const peekBtn = document.getElementById('btn-peek');
         const setPeek = (on) => { if (peeking === on) return; peeking = on; peekBtn.textContent = on ? '👁 Showing words: let go to hide' : '👁 Hold to peek at words'; renderWordText(); };
         peekBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); setPeek(true); });

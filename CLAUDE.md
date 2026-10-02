@@ -8,7 +8,7 @@ A two-screen spelling bee app. Three static pages talk to one FastAPI backend:
 
 - **`setup.html`** (laptop): CRUD for sessions, teams, players, and words over REST.
 - **`control.html`** (phone, the "judge"): picks the player (or the team, in a team game) and the word, runs the timer, reveals hints, marks results. It sends WebSocket commands.
-- **`display.html`** (TV): passive. It renders whatever state the server broadcasts and plays sounds and speech. It needs a click on "Click to start" first, because browsers only allow audio and speech after a user gesture. The spelling view shows the word in large text, unless the controller's hide toggle (`hide_word`) is on, in which case it shows only the first letter, a blurred placeholder and the definition.
+- **`display.html`** (TV): passive. It renders whatever state the server broadcasts and plays sounds and speech. It needs a click on "Click to start" first, because browsers only allow audio and speech after a user gesture. The spelling view shows the word in large text, unless `hide_word` is on, in which case it shows only the first letter, a blurred placeholder and the definition. The controller has three modes, `wordVisibility` in localStorage: `show`, `phone` (the default: masked on the phone, whole on the TV) and `both`. Only `both` sends `SET_HIDE_WORD true`; the phone-side masking (`maskWord`, `hideOnPhone()`) is local to the controller.
 
 The display and controller both take `?session=ID`, which Setup's copy-link buttons generate. The display needs it. The controller uses it to preselect and open the session, and falls back to its dropdown without it.
 
