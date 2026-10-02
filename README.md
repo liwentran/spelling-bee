@@ -60,7 +60,7 @@ You need three screens. They don't have to be on the same device, but they must 
 |---|---|---|---|
 | 1. Call someone up | Tap **Next up: *name* ➡**, or tap any **player's name** under *Select Player* | Tap **Next up: *team* ➡**, or tap any **team** under *Select Team*. The whole team spells together as a chain, one letter each | "Up Next": the player's bio, or the team with a card for every member |
 | 2. Pick a word | Tab **Player's** (their words + their team's pool), **Pool**, or **All** → tap a word | Tab **Team's** (team pool + all members' words), **Pool**, or **All** → tap a word | The spelling screen with the word, the player/team name, and the round |
-| 3. Say the word | Tap **🔊 Pronounce Word** (repeat as often as asked) | same | The TV speaks the word aloud |
+| 3. Say the word | Tap **🔊 Pronounce Word** (repeat as often as asked). **🐢 2× slower** and **🐌 3× slower** say it again, slowly | same | The TV speaks the word aloud |
 | 4. Start the clock | Tap **▶**. **⏸** pauses, **↺** resets. Change the length with **−15s / +15s** under *Time per word* (only while the clock is stopped; the change is saved for the session) | same | The timer bar runs along the bottom: green → yellow → red, ticking in the last 10 seconds |
 | 5. Answer questions | When the speller asks, tap **📖 Definition**, **📝 Sentence**, **🌍 Origin**, **🔤 Part of Speech** or **🔊 Alt. Pronunciations**. Tap again to hide it | same | The hint appears on screen and is read aloud |
 | 6. Judge | Tap **✅ CORRECT** or **❌ INCORRECT**. If the clock hits zero, **⏰ TIMEOUT** happens automatically | same | Who spelled, green confetti or red/orange with the correct spelling, and their running score |

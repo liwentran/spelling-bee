@@ -67,7 +67,14 @@
         <button id="btn-hide-word" class="w-full bg-gray-800 border border-gray-600 py-3 rounded-xl text-lg font-semibold active:scale-95 transition-transform"></button>
 
         <!-- Pronounce -->
-        <button id="btn-pronounce" disabled class="w-full bg-purple-700 hover:bg-purple-600 py-4 rounded-xl text-2xl font-bold shadow-lg active:scale-95 transition-transform disabled:opacity-40 disabled:active:scale-100">🔊 Pronounce Word</button>
+        <div class="space-y-2">
+            <button id="btn-pronounce" disabled class="pronounce-btn w-full bg-purple-700 hover:bg-purple-600 py-4 rounded-xl text-2xl font-bold shadow-lg active:scale-95 transition-transform disabled:opacity-40 disabled:active:scale-100">🔊 Pronounce Word</button>
+            <!-- Same word, spoken 2× / 3× slower than normal -->
+            <div class="grid grid-cols-2 gap-2">
+                <button id="btn-pronounce-2x" disabled class="pronounce-btn bg-purple-900 border border-purple-600 py-3 rounded-xl text-lg font-bold active:scale-95 transition-transform disabled:opacity-40 disabled:active:scale-100">🐢 2× slower</button>
+                <button id="btn-pronounce-3x" disabled class="pronounce-btn bg-purple-900 border border-purple-600 py-3 rounded-xl text-lg font-bold active:scale-95 transition-transform disabled:opacity-40 disabled:active:scale-100">🐌 3× slower</button>
+            </div>
+        </div>
 
         <!-- Timer -->
         <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
@@ -271,7 +278,7 @@
                 }
             });
 
-            document.getElementById('btn-pronounce').disabled = !s.current_word_id;
+            document.querySelectorAll('.pronounce-btn').forEach(btn => { btn.disabled = !s.current_word_id; });
             if (!!s.hide_word !== hideWord) ws.setHideWord(hideWord);
 
             // Judge once per word; Undo reopens it
@@ -625,7 +632,10 @@
             timerSeconds = timerDuration;
             updateTimerDisplay();
         };
-        document.getElementById('btn-pronounce').onclick = () => ws.pronounceWord();
+        const PRONOUNCE_RATE = 0.8; // normal speed; the slow buttons divide it
+        document.getElementById('btn-pronounce').onclick = () => ws.pronounceWord(PRONOUNCE_RATE);
+        document.getElementById('btn-pronounce-2x').onclick = () => ws.pronounceWord(PRONOUNCE_RATE / 2);
+        document.getElementById('btn-pronounce-3x').onclick = () => ws.pronounceWord(PRONOUNCE_RATE / 3);
         const hideBtn = document.getElementById('btn-hide-word');
         const renderHideBtn = () => {
             hideBtn.textContent = hideWord ? '🙈 TV: first letter + definition only' : '👁 TV: showing the whole word';
