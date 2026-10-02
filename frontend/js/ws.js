@@ -98,5 +98,6 @@ export const showScoreboard = () => send({ type: 'SHOW_SCOREBOARD' });
 export const showPlayerIntro = () => send({ type: 'SHOW_PLAYER_INTRO' });
 export const showTeamIntro = () => send({ type: 'SHOW_TEAM_INTRO' });
 export const nextRound = () => send({ type: 'NEXT_ROUND' });
+export const prevRound = () => send({ type: 'PREV_ROUND' });
 export const playSound = (sound) => send({ type: 'PLAY_SOUND', sound });
 export const pronounceWord = (rate) => send({ type: 'PRONOUNCE_WORD', rate });

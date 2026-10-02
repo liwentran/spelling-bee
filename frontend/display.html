@@ -35,6 +35,9 @@
         <p class="text-sm text-gray-400 mt-4" id="session-info"></p>
     </div>
 
+    <!-- Shown whenever the browser is blocking sound; clicking it turns sound on (with a test beep) -->
+    <button id="sound-off" class="hidden fixed top-4 right-4 z-40 bg-red-700 hover:bg-red-600 text-white text-lg font-bold px-4 py-2 rounded-xl shadow-lg">🔇 Sound is off · click to turn on</button>
+
     <!-- Views Container -->
     <div id="views" class="w-full h-full flex flex-col justify-center items-center relative z-10 max-w-6xl mx-auto px-8">
 
@@ -157,6 +160,8 @@
         dom.clickToStart.onclick = async () => {
             dom.clickToStart.classList.add('hidden');
             sounds.initAudio();
+            sounds.playBeeps(1); // audible confirmation that sound works on this TV
+            watchSound();
             // Speech synthesis needs a user gesture before it will play; prime it here
             if ('speechSynthesis' in window) window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
 
@@ -197,6 +202,16 @@
             if (voice) utterance.voice = voice;
             synth.speak(utterance);
         }
+
+        // If the browser blocks or suspends audio (tab muted by policy, reloaded without a click, iOS),
+        // say so on screen instead of failing silently
+        const soundOff = document.getElementById('sound-off');
+        function watchSound() {
+            const update = () => soundOff.classList.toggle('hidden', sounds.audioState() === 'running');
+            update();
+            setInterval(update, 2000);
+        }
+        soundOff.onclick = () => { sounds.initAudio(); sounds.playBeeps(1); setTimeout(() => soundOff.classList.toggle('hidden', sounds.audioState() === 'running'), 300); };
 
         function handlePronounce({ word, rate }) {
             speak(word, rate || 0.8);
@@ -507,7 +522,7 @@
                         teamSb.style.gridTemplateColumns = '1fr';
                         teamSb.innerHTML = teamScoreboard.map((t, i) => `
                         <div class="flex items-center gap-6 bg-gray-900/60 rounded-2xl px-8 py-5 border-l-8 ${t.eliminated ? 'opacity-40' : ''}" style="border-color: ${teamColor(t.team_color)}">
-                            <div class="text-4xl font-black opacity-50 w-12">${i + 1}</div>
+                            <div class="text-3xl font-black opacity-40 w-12" title="Turn order">${i + 1}</div>
                             <div class="flex-1 min-w-0">
                                 <div class="text-4xl font-bold ${t.eliminated ? 'line-through' : ''}" style="color: ${teamColor(t.team_color)}">${esc(t.team_name)}</div>
                                 <div class="text-lg text-gray-300 opacity-80 mt-1 truncate">${memberNames(t.team_id)}</div>

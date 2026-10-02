@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session as DbSession, select
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel
 from database import get_session
 from models import Team, Session
@@ -51,6 +51,18 @@ def create_team(session_id: str, team_data: TeamCreate, db: DbSession = Depends(
 def list_teams(session_id: str, db: DbSession = Depends(get_session)):
     statement = select(Team).where(Team.session_id == session_id).order_by(Team.sort_order)
     return db.exec(statement).all()
+
+@router.put("/reorder")
+def reorder_teams(session_id: str, team_ids: List[str], db: DbSession = Depends(get_session)):
+    """Set the turn order (controller drag / shuffle); teams not listed keep their place after these."""
+    teams = {t.id: t for t in db.exec(select(Team).where(Team.session_id == session_id)).all()}
+    ordered = [teams[tid] for tid in team_ids if tid in teams]
+    ordered += sorted((t for t in teams.values() if t not in ordered), key=lambda t: t.sort_order)
+    for idx, team in enumerate(ordered, start=1):
+        team.sort_order = idx
+        db.add(team)
+    db.commit()
+    return {"ok": True}
 
 @router.patch("/{team_id}")
 def update_team(session_id: str, team_id: str, team_data: TeamUpdate, db: DbSession = Depends(get_session)):

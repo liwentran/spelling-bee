@@ -24,6 +24,9 @@ export async function updateSession(id, data) { return request(`/sessions/${id}`
 export async function deleteSession(id) { return request(`/sessions/${id}`, { method: 'DELETE' }); }
 export async function resetSession(id) { return request(`/sessions/${id}/reset`, { method: 'POST' }); }
 
+// Teams order (controller drag / shuffle)
+export async function reorderTeams(sessionId, teamIds) { return request(`/sessions/${sessionId}/teams/reorder`, { method: 'PUT', headers: jsonHeaders, body: JSON.stringify(teamIds) }); }
+
 // Players
 export async function fetchPlayers(sessionId) { return request(`/sessions/${sessionId}/players/`); }
 export async function createPlayer(sessionId, data) { return request(`/sessions/${sessionId}/players/`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify(data) }); }

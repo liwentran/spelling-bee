@@ -51,7 +51,7 @@ You need three screens. They don't have to be on the same device, but they must 
 
 ### 2. Start the screens
 
-- **TV:** click anywhere on **"Click anywhere to connect and enable audio"**. Browsers block sound and speech until someone clicks, so if you skip this the TV stays silent.
+- **TV:** click anywhere on **"Click anywhere to connect and enable audio"**. Browsers block sound and speech until someone clicks, so if you skip this the TV stays silent. You'll hear one test beep when sound is working. If the browser still blocks sound, a red **🔇 Sound is off** button appears in the corner; click it. If there's no beep and no button, check the TV's volume, whether the browser tab is muted, and on an iPhone/iPad the silent switch.
 - **Controller:** the controller link opens the session automatically. If you opened `/static/control.html` directly, pick the session in the top dropdown. The dot in the top-right turns **green** when connected.
 
 ### 3. Each turn (Controller)
@@ -84,8 +84,10 @@ Then go back to step 1. Teams or players who have already gone this round get a 
 
 A **round** is one word for each team (or player) still in the game. When everyone has gone, the controller says *Round N complete*.
 
+- **Team order** (team games): on the controller, hold a team and drag it to reorder, or tap **🔀 Shuffle** for a random order. That order is the turn order and is also how the TV scoreboard lists teams.
 - **Scoreboard**: shows standings on the TV, ranked by words spelled correctly, then by fewest misses. Eliminated teams/players go to the bottom. Team rows list their players in small text, and the Active/Eliminated labels only appear in elimination games.
 - **Next Round ➡**: starts the next round. The TV shows the new round number and the ✓ marks clear. If someone hasn't gone yet, it asks you first.
+- **⬅ Prev Round**: goes back one round (e.g. if Next Round was pressed by mistake). Who has already gone that round comes back from the saved turns.
 - **Winning:** with Elimination Mode on, once only one team (or player) is left standing, the TV and the controller show **🏆 *name* wins!** Without elimination, play as many rounds as you like; the top of the scoreboard wins.
 - Scores and the round number are saved, so refreshing a screen or restarting the server doesn't lose the game.
 - **Clear Display**: returns the TV to the idle title screen, between turns or at the end.

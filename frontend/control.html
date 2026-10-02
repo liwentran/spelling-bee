@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Controller - Spelling Bee</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #111827; color: white; overscroll-behavior-y: contain; }
@@ -39,7 +40,11 @@
 
         <!-- Players (individual mode) / Teams (team mode) -->
         <div>
-            <h3 id="select-heading" class="text-sm text-gray-400 mb-2 uppercase tracking-wide">Select Player</h3>
+            <div class="flex items-center gap-2 mb-2">
+                <h3 id="select-heading" class="text-sm text-gray-400 uppercase tracking-wide">Select Player</h3>
+                <button id="btn-shuffle-teams" class="hidden bg-gray-700 hover:bg-gray-600 px-2.5 py-1 rounded text-sm font-semibold active:scale-95 transition-transform" title="Randomize the team order">🔀 Shuffle</button>
+                <span id="drag-hint" class="hidden text-xs text-gray-500">hold &amp; drag to reorder</span>
+            </div>
             <div id="player-list" class="flex overflow-x-auto hide-scroll space-x-3 pb-2"></div>
             <!-- Round progress: who has gone this round, and who's next -->
             <div class="mt-2 flex items-center justify-between gap-3">
@@ -136,7 +141,8 @@
             <div class="grid grid-cols-2 gap-3">
                 <button id="btn-clear" class="bg-gray-700 py-3 rounded-lg active:scale-95 transition-transform">Clear Display</button>
                 <button id="btn-scoreboard" class="bg-blue-700 py-3 rounded-lg active:scale-95 transition-transform">Scoreboard</button>
-                <button id="btn-next-round" class="bg-indigo-700 py-3 rounded-lg col-span-2 font-bold active:scale-95 transition-transform">Next Round ➡</button>
+                <button id="btn-prev-round" class="bg-gray-700 py-3 rounded-lg font-bold active:scale-95 transition-transform">⬅ Prev Round</button>
+                <button id="btn-next-round" class="bg-indigo-700 py-3 rounded-lg font-bold active:scale-95 transition-transform">Next Round ➡</button>
             </div>
         </div>
     </div>
@@ -258,6 +264,10 @@
             const isTeam = gameMode === 'team';
             dom.selectHeading.textContent = isTeam ? 'Select Team' : 'Select Player';
             tabButtons.player.textContent = isTeam ? "Team's" : "Player's";
+            // Reordering only applies to teams (turn order + TV scoreboard order)
+            document.getElementById('btn-shuffle-teams').classList.toggle('hidden', !isTeam);
+            document.getElementById('drag-hint').classList.toggle('hidden', !isTeam);
+            teamSorter.option('disabled', !isTeam);
         }
 
         function handleStateUpdate(msg) {
@@ -454,11 +464,39 @@
                 else if (t.eliminated) cls = 'bg-gray-800 text-gray-500 line-through opacity-60';
                 const count = players.filter(p => p.team_id === t.id).length;
                 const doneMark = (state.round_done || []).includes(t.id) ? '✓ ' : '';
-                return `<button onclick="window.selectTeam('${t.id}')" class="${pillBase} ${cls}" style="${style}">${doneMark}${t.name} <span class="text-sm font-normal opacity-70">${count}</span></button>`;
+                return `<button data-id="${t.id}" onclick="window.selectTeam('${t.id}')" class="${pillBase} ${cls}" style="${style}">${doneMark}${t.name} <span class="text-sm font-normal opacity-70">${count}</span></button>`;
             }).join('') || '<div class="text-gray-500 py-2">No teams — add them in Setup</div>';
         }
 
+        // Team order = turn order, also used by the TV scoreboard. Hold a team button to drag it; 🔀 shuffles.
+        let justDragged = false;
+        async function saveTeamOrder(ids) {
+            teams.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+            renderTeams();
+            try {
+                await api.reorderTeams(dom.select.value, ids);
+                if (state.display_mode === 'scoreboard') ws.showScoreboard(); // refresh the TV's order
+            } catch (e) { alert('Could not save the team order: ' + e.message); }
+        }
+        const teamSorter = Sortable.create(dom.playerList, {
+            animation: 150,
+            direction: 'horizontal',
+            delay: 250, delayOnTouchOnly: true, // hold to drag on phones; a quick tap still selects
+            draggable: 'button[data-id]',
+            disabled: true,
+            onEnd: (e) => {
+                justDragged = true; setTimeout(() => { justDragged = false; }, 300);
+                if (e.oldIndex !== e.newIndex) saveTeamOrder(teamSorter.toArray());
+            },
+        });
+        document.getElementById('btn-shuffle-teams').onclick = () => {
+            const ids = teams.map(t => t.id);
+            for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+            saveTeamOrder(ids);
+        };
+
         window.selectTeam = (id) => {
+            if (justDragged) return; // the tap that ends a drag isn't a selection
             selectedTeamId = id;
             ws.setActiveTeam(id);
             ws.showTeamIntro();
@@ -717,6 +755,13 @@
         ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => peekBtn.addEventListener(ev, () => setPeek(false)));
         peekBtn.addEventListener('contextmenu', (e) => e.preventDefault()); // long-press menu on phones
         document.getElementById('btn-scoreboard').onclick = ws.showScoreboard;
+        document.getElementById('btn-prev-round').onclick = () => {
+            const round = state.round_number || 1;
+            if (round <= 1) return alert("Already on round 1.");
+            if (!confirm(`Go back to round ${round - 1}?`)) return;
+            stopTimer();
+            ws.prevRound();
+        };
         document.getElementById('btn-next-round').onclick = () => {
             const isTeam = gameMode === 'team';
             const done = new Set(state.round_done || []);

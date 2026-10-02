@@ -65,9 +65,11 @@ def compute_scoreboard(db: DbSession, session_id: str) -> dict:
             "rounds_survived": rounds_survived(team),
             **_tally(team_turns),
         })
-    # Still standing first, then most words right, then fewest misses
+    # Team games list teams in turn order (Team.sort_order, set by dragging/shuffling on the controller),
+    # so the TV scoreboard matches the controller. Otherwise: standing first, most right, fewest misses.
     rank = lambda r: (r["eliminated"], -r["total_correct"], r["total_attempts"] - r["total_correct"])
-    team_rows.sort(key=rank)
+    if sess.game_mode != "team":
+        team_rows.sort(key=rank)
 
     # Elimination mode ends when one contestant is left standing (once someone has been knocked out)
     winner = None

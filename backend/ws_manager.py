@@ -400,6 +400,23 @@ class ConnectionManager:
             state.timer_running = False
             state.timer_seconds_remaining = state.timer_duration
 
+        elif cmd_type == "PREV_ROUND":
+            # Go back a round (e.g. Next Round was pressed by mistake); who has gone comes from saved turns
+            if state.round_number > 1:
+                state.round_number -= 1
+                _save_round(session_id, state.round_number)
+                with SQLSession(get_engine()) as db:
+                    _refresh_round_done(state, db, session_id)
+                state.last_turn = None
+                state.display_mode = "idle"
+                state.current_team_id = state.team_details = None
+                state.current_player_id = state.player_details = None
+                state.current_word_id = state.word_details = None
+                state.result = None
+                state.revealed_info.clear()
+                state.timer_running = False
+                state.timer_seconds_remaining = state.timer_duration
+
         elif cmd_type == "PLAY_SOUND":
             # Just broadcast sound command, don't change state
             await self.broadcast(session_id, {"type": "PLAY_SOUND", "sound": command.get("sound")})

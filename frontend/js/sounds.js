@@ -1,12 +1,24 @@
 let audioCtx = null;
 
+// Must be called from a click/tap: browsers keep audio blocked until the user interacts with the page
 export function initAudio() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    if (audioCtx.state === 'suspended') {
+    if (audioCtx.state !== 'running') {
         audioCtx.resume();
     }
+    // iOS/Safari also need a sound actually started inside the gesture; play one silent sample
+    const buffer = audioCtx.createBuffer(1, 1, 22050);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(audioCtx.destination);
+    src.start(0);
+}
+
+// 'running' when sound can play; anything else means the browser is still blocking it
+export function audioState() {
+    return audioCtx ? audioCtx.state : 'not-started';
 }
 
 export function playBell() {
