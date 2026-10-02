@@ -42,12 +42,12 @@ You need three screens. They don't have to be on the same device, but they must 
 1. Click **+ New Session**. Enter a name, set the timer (seconds per word), and tick **Elimination Mode** if a miss knocks you out. Choose **👤 Individual** or **👥 Team**, then click **Create**.
 2. Click the session in the list to open it. Setup reopens the last session you used. You can change **⏱ Time per word** at the top at any time.
 3. **Team game only:** click **+ Add Team** for each team. Give it a name and pick a color.
-4. Click **+ Add Player** for each speller. In a team game, choose their team in the dropdown. Every player is listed with their details; click **✏️ Edit** on one to change them.
+4. Click **+ Add Player** for each speller. In a team game, choose their team in the dropdown. Every player is listed with their details; click **✏️ Edit** on one to change them, or **Bulk Edit** to edit them all as JSON.
 5. Add words:
    - **+ Add Word**, one at a time. The last dropdown in the form (it starts at "-- Session Pool --") gives the word to one player, a team's pool, or the shared pool.
-   - **Bulk Import**, to paste a JSON list of words.
+   - **Bulk Edit**, to edit or paste the whole word list as JSON. **📄 Load example** shows the format. Players have a **Bulk Edit** too.
    - **Copy for AI** → ask ChatGPT/Claude to write players, fun facts and words → paste the reply into **Import JSON**.
-6. Click **📺 Copy Display Link (TV)** and open it on the TV. Click **📱 Copy Controller Link** and open it on the judge's phone.
+6. Click **📺 Copy Display Link (TV)** and open it on the TV. Click **📱 Copy Controller Link** and open it on the judge's phone. The **↗** next to each opens it in a new tab on this computer.
 
 ### 2. Start the screens
 
@@ -161,29 +161,37 @@ Import rules (into an existing session):
 - Words with an unknown `player_name`/`team_name` are skipped, with a warning.
 - API: `?dry_run=true` previews the changes without saving, and `?mode=merge` only adds and updates, never removing. `make seed` uses merge, so it never deletes anything added by hand.
 
-## Bulk Word Import Format
+## Bulk Editing Players and Words
+
+The **Players** and **Words** sections each have a **Bulk Edit** button. It opens a JSON box already filled with the current list, with these buttons:
+
+- **⤓ Load current**: refill the box with what's in the session now. This is your starting point.
+- **📄 Load example**: a ready template using your session's real team and player names.
+- **📋 Copy**: copy the box, for example to paste into ChatGPT/Claude.
+- **Save (replace)**: the list becomes exactly what's in the box. You're asked to confirm anything that would be removed.
+- **Add only**: add new entries and update matching ones; nothing is removed.
+
+Players are one flat list. In a team game, give each player a `team_name`:
 
 ```json
 [
-  {
-    "word": "ephemeral",
-    "definition": "lasting for a very short time",
-    "sentence": "The ephemeral beauty of the cherry blossoms drew crowds every spring.",
-    "part_of_speech": "adjective",
-    "language_of_origin": "Greek",
-    "difficulty": 3,
-    "player_name": "Alice"
-  },
-  {
-    "word": "apiary",
-    "definition": "a place where bees are kept",
-    "difficulty": 3,
-    "team_name": "Honeybees"
-  }
+  { "name": "Maya Chen", "age": "11", "grade": "6th", "school": "Lincoln Middle", "fun_fact": "...", "team_name": "Honeybees" },
+  { "name": "Priya Patel", "grade": "6th", "team_name": "Bumblebees" }
 ]
 ```
 
-Use `player_name` to give a word to one player, `team_name` to put it in a team's pool, or neither for the shared session pool.
+Each word goes to exactly one place: a player (`player_name`), a team's pool (`team_name`), or, with neither, the shared session pool.
+
+```json
+[
+  { "word": "ephemeral", "definition": "lasting for a very short time", "sentence": "...", "part_of_speech": "adjective",
+    "language_of_origin": "Greek", "difficulty": 3, "player_name": "Maya Chen" },
+  { "word": "apiary", "definition": "a place where bees are kept", "difficulty": 3, "team_name": "Honeybees" },
+  { "word": "pneumonia", "definition": "a lung infection", "difficulty": 4 }
+]
+```
+
+Every JSON box in Setup has a **📄 Load example** button: Bulk Edit (players and words), **Import JSON** (whole session) and **New Session → From JSON**.
 
 ## Example Data
 

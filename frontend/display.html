@@ -221,6 +221,18 @@
         }
 
         // Escape user/AI-entered text before putting it into innerHTML
+        // Show grades as "6th Grade" whatever was typed: "6", "6th", "6th grade", "Grade 6", "K"
+        function formatGrade(grade) {
+            const g = String(grade ?? '').trim();
+            if (!g) return '';
+            if (/^(k|kg|kindergarten)$/i.test(g)) return 'Kindergarten';
+            const m = g.match(/^(?:grade\s*)?(\d{1,2})(?:st|nd|rd|th)?(?:\s*grade)?(.*)$/i);
+            if (!m) return g; // free text (e.g. "Pre-K", "Senior") is shown as-is
+            const n = parseInt(m[1]);
+            const suffix = (n % 100 >= 11 && n % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+            return `${n}${suffix} Grade${m[2]}`; // keeps extras like " (honors)"
+        }
+
         const esc = (str) => String(str ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
         // Team colors are user-entered; only allow hex values into style attributes
@@ -298,7 +310,7 @@
                     if (player) {
                         document.getElementById('intro-name').textContent = player.name;
                         document.getElementById('intro-age').textContent = player.age ? `Age ${player.age}` : '';
-                        document.getElementById('intro-grade').textContent = player.grade || '';
+                        document.getElementById('intro-grade').textContent = formatGrade(player.grade);
                         document.getElementById('intro-school').textContent = player.school || '';
                         document.getElementById('intro-fact').textContent = player.fun_fact ? `"${player.fun_fact}"` : '';
                         const introTeam = document.getElementById('intro-team');
@@ -322,7 +334,7 @@
                         grid.style.gridTemplateColumns = `repeat(${Math.min(Math.max(members.length, 1), 4)}, minmax(0, 1fr))`;
                         grid.innerHTML = members.map(m => {
                             const isSpeller = s.current_player_id === m.id;
-                            const meta = [m.age ? `Age ${m.age}` : '', m.grade, m.school].filter(Boolean).map(esc).join(' · ');
+                            const meta = [m.age ? `Age ${m.age}` : '', formatGrade(m.grade), m.school].filter(Boolean).map(esc).join(' · ');
                             return `
                             <div class="bg-gray-900/60 rounded-2xl p-6 border-2 slide-up" style="border-color: ${isSpeller ? teamColor(team.color) : 'rgba(75,85,99,0.6)'}">
                                 ${isSpeller ? `<div class="text-sm font-bold uppercase tracking-widest mb-2" style="color: ${teamColor(team.color)}">Spelling</div>` : ''}

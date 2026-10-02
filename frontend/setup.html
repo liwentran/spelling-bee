@@ -39,6 +39,7 @@
                     <textarea id="new-session-json" rows="10" class="w-full p-2 border rounded font-mono text-xs mb-2" placeholder='{"name": "Spring Bee", "game_mode": "team", "timer_duration_seconds": 90, "elimination_mode": true, "teams": [...], "players": [...], "words": [...]}'></textarea>
                     <div class="flex flex-wrap gap-2">
                         <button id="btn-create-session-json" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Create from JSON</button>
+                        <button id="btn-new-load-example" class="bg-white border px-3 py-2 rounded text-sm hover:bg-gray-100">📄 Load example</button>
                         <button id="btn-copy-template" class="bg-indigo-600 text-white px-3 py-2 rounded text-sm">Copy blank template for AI</button>
                         <button id="btn-cancel-session-json" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
                     </div>
@@ -92,6 +93,9 @@
                     <button id="btn-copy-control" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition shadow-sm">
                         <span>📱 Copy Controller Link</span>
                     </button>
+                    <a id="btn-open-control" href="#" target="_blank" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1.5 rounded text-sm font-medium transition" title="Open Controller in new tab">
+                        ↗
+                    </a>
                 </div>
             </div>
 
@@ -108,6 +112,10 @@
                     </div>
                 </div>
                 <div id="roster-import-form" class="hidden mt-4">
+                    <div class="flex flex-wrap gap-2 mb-2 text-sm">
+                        <button id="btn-roster-load-current" class="bg-white border px-3 py-1 rounded hover:bg-gray-100">⤓ Load current session</button>
+                        <button id="btn-roster-load-example" class="bg-white border px-3 py-1 rounded hover:bg-gray-100">📄 Load example</button>
+                    </div>
                     <textarea id="roster-json" rows="8" class="w-full p-2 border rounded font-mono text-sm mb-2" placeholder='{"game_mode": "team", "teams": [{"name": "Hawks", "players": [{"name": "Ann"}]}], "words": [{"word": "talon", "team_name": "Hawks"}]}'></textarea>
                     <div class="flex space-x-2">
                         <button id="btn-roster-import" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Import</button>
@@ -138,9 +146,27 @@
             <div class="bg-white p-6 rounded-lg shadow">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold">Players <span id="player-count" class="text-sm font-normal text-gray-400"></span></h2>
-                    <button id="btn-add-player" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">+ Add Player</button>
+                    <div class="space-x-2">
+                        <button id="btn-add-player" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">+ Add Player</button>
+                        <button id="btn-players-bulk" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">Bulk Edit</button>
+                    </div>
                 </div>
 
+                <div id="players-bulk-form" class="hidden bg-gray-50 p-4 rounded mb-4 border">
+                    <p class="text-sm mb-2 text-gray-600">Edit all players as JSON. Each player can have <code>name</code>, <code>age</code>, <code>grade</code>, <code>school</code>, <code>fun_fact</code> and, in a team game, <code>team_name</code>. Players are matched by name, so keep a name the same to update that player.</p>
+                    <div class="flex flex-wrap gap-2 mb-2 text-sm">
+                        <button id="btn-players-load-current" class="bg-white border px-3 py-1 rounded hover:bg-gray-100">⤓ Load current players</button>
+                        <button id="btn-players-load-example" class="bg-white border px-3 py-1 rounded hover:bg-gray-100">📄 Load example</button>
+                        <button id="btn-players-copy" class="bg-white border px-3 py-1 rounded hover:bg-gray-100">📋 Copy</button>
+                    </div>
+                    <textarea id="players-bulk-json" rows="10" class="w-full p-2 border rounded font-mono text-xs mb-2" placeholder="Click Load current players or Load example"></textarea>
+                    <div class="flex flex-wrap gap-2">
+                        <button id="btn-players-save" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1" title="The players become exactly this list; you'll confirm any removals">Save (replace players)</button>
+                        <button id="btn-players-add" class="bg-blue-600 text-white px-4 py-2 rounded text-sm" title="Add new and update matching players; nothing is removed">Add only</button>
+                        <button id="btn-players-cancel" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
+                    </div>
+                </div>
+                <div id="players-bulk-result" class="hidden mb-3 text-sm p-3 rounded border"></div>
                 <div id="new-player-form" class="hidden bg-gray-50 p-4 rounded mb-4 border grid grid-cols-2 gap-2">
                     <input type="text" id="player-name" placeholder="Name (Required)" class="col-span-2 p-2 border rounded">
                     <input type="number" id="player-age" placeholder="Age" class="p-2 border rounded">
@@ -165,19 +191,26 @@
                     <h2 class="text-xl font-bold">Words <span id="word-count" class="text-sm font-normal text-gray-400"></span></h2>
                     <div class="space-x-2">
                         <button id="btn-add-word" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">+ Add Word</button>
-                        <button id="btn-import-words" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">Bulk Import</button>
+                        <button id="btn-words-bulk" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">Bulk Edit</button>
                     </div>
                 </div>
 
                 <!-- Bulk Import Modal inline -->
-                <div id="import-words-form" class="hidden bg-gray-50 p-4 rounded mb-4 border">
-                    <p class="text-sm mb-2 text-gray-600">Paste JSON array of words. E.g.: <code>[{"word": "apple", "definition": "fruit", "difficulty": 1, "player_name": "Alice"}]</code>. Use <code>"team_name"</code> instead of <code>"player_name"</code> to add a word to a team's pool.</p>
-                    <textarea id="import-json" rows="5" class="w-full p-2 border rounded font-mono text-sm mb-2"></textarea>
-                    <div class="flex space-x-2">
-                        <button id="btn-save-import" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1">Import</button>
-                        <button id="btn-cancel-import" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
+                <div id="words-bulk-form" class="hidden bg-gray-50 p-4 rounded mb-4 border">
+                    <p class="text-sm mb-2 text-gray-600">Edit all words as JSON. Assign each word with <code>"player_name"</code> (one player), <code>"team_name"</code> (a team's pool), or neither (the shared session pool). Words are matched by their text.</p>
+                    <div class="flex flex-wrap gap-2 mb-2 text-sm">
+                        <button id="btn-words-load-current" class="bg-white border px-3 py-1 rounded hover:bg-gray-100">⤓ Load current words</button>
+                        <button id="btn-words-load-example" class="bg-white border px-3 py-1 rounded hover:bg-gray-100">📄 Load example</button>
+                        <button id="btn-words-copy" class="bg-white border px-3 py-1 rounded hover:bg-gray-100">📋 Copy</button>
+                    </div>
+                    <textarea id="words-bulk-json" rows="10" class="w-full p-2 border rounded font-mono text-xs mb-2" placeholder="Click Load current words or Load example"></textarea>
+                    <div class="flex flex-wrap gap-2">
+                        <button id="btn-words-save" class="bg-green-600 text-white px-4 py-2 rounded text-sm flex-1" title="The words become exactly this list; you'll confirm any removals">Save (replace words)</button>
+                        <button id="btn-words-add" class="bg-blue-600 text-white px-4 py-2 rounded text-sm" title="Add new and update matching words; nothing is removed">Add only</button>
+                        <button id="btn-words-cancel" class="bg-gray-300 px-4 py-2 rounded text-sm">Cancel</button>
                     </div>
                 </div>
+                <div id="words-bulk-result" class="hidden mb-3 text-sm p-3 rounded border"></div>
 
                 <!-- Add Word Form -->
                 <div id="new-word-form" class="hidden bg-gray-50 p-4 rounded mb-4 border grid grid-cols-2 gap-2">
@@ -288,8 +321,6 @@
         document.getElementById('btn-add-word').onclick = () => openWordForm();
         document.getElementById('btn-cancel-word').onclick = () => { editingWordId = null; toggleForm('new-word-form', false); };
         window.editWord = (id) => openWordForm(words.find(w => w.id === id));
-        document.getElementById('btn-import-words').onclick = () => toggleForm('import-words-form', true);
-        document.getElementById('btn-cancel-import').onclick = () => toggleForm('import-words-form', false);
 
         async function loadSessions() {
             try {
@@ -390,10 +421,12 @@
             const btnCopyDisp = document.getElementById('btn-copy-display');
             const btnOpenDisp = document.getElementById('btn-open-display');
             const btnCopyCtrl = document.getElementById('btn-copy-control');
+            const btnOpenCtrl = document.getElementById('btn-open-control');
             
             btnCopyDisp.onclick = () => copyToClipboard(getDisplayUrl(id), btnCopyDisp, 'Copied!');
             btnOpenDisp.href = getDisplayUrl(id);
             btnCopyCtrl.onclick = () => copyToClipboard(getControlUrl(id), btnCopyCtrl, 'Copied!');
+            btnOpenCtrl.href = getControlUrl(id);
 
             loadSessions(); // to update active state
             await loadSessionData();
@@ -651,36 +684,38 @@
             loadSessionData();
         };
 
-        document.getElementById('btn-save-import').onclick = async () => {
-            try {
-                const json = JSON.parse(document.getElementById('import-json').value);
-                await api.bulkImportWords(currentSession.id, json);
-                toggleForm('import-words-form', false);
-                document.getElementById('import-json').value = '';
-                loadSessionData();
-            } catch (e) {
-                alert('Invalid JSON: ' + e.message);
-            }
-        };
-
         // --- AI Import / Export ---
         const JSON_RULES = `Rules:
 - Session settings: "name"; "game_mode" is "individual" or "team"; "timer_duration_seconds" is the time per word (15-600); "elimination_mode" is true if a miss knocks the speller (or team) out.
-- In a team game, list each player inside their team's "players" (teams have "name" and a hex "color"). In an individual game, put players in the top-level "players".
+- Players: in a team game, list each player inside their team's "players" (teams have "name" and a hex "color"). In an individual game, put players in the top-level "players" and use no teams.
+- Assigning words: every word goes to exactly one place.
+  * One player's word:   {"word": "...", "player_name": "<exact player name>"}
+  * A team's pool:       {"word": "...", "team_name": "<exact team name>"}   (team games only)
+  * Shared session pool: {"word": "..."}   (no player_name or team_name; good for tiebreakers)
 - Teams and players are matched by name and words by their text: keep a name exactly the same to update that entry; a new name adds a new one.
-- Words: "player_name" gives a word to one player, "team_name" puts it in a team's pool, neither puts it in the shared pool. "difficulty" is 1-5.
-- Player fields: name, age, grade, school, fun_fact. Word fields: word, definition, sentence, part_of_speech, language_of_origin, alternate_pronunciations, difficulty.`;
+- Player fields: name, age, grade, school, fun_fact. Word fields: word, definition, sentence, part_of_speech, language_of_origin, alternate_pronunciations, difficulty (1-5).`;
         const AI_INSTRUCTIONS = `Below is my spelling bee setup as JSON. Change it however I ask after the JSON, then reply with ONLY the complete JSON in the same format.
 IMPORTANT: your JSON replaces the whole setup. Include EVERY team, player and word that should remain, not just the changes. Anything you leave out of "teams", "players" or "words" will be deleted.\n${JSON_RULES}`;
-        const TEMPLATE_INSTRUCTIONS = `Write a complete spelling bee session as JSON in exactly this format, then reply with ONLY the JSON. Fill in real words with accurate definitions, example sentences, part of speech, language of origin and difficulty (1-5).\n${JSON_RULES}`;
+        const TEMPLATE_INSTRUCTIONS = `Write a complete spelling bee session as JSON in exactly this format, then reply with ONLY the JSON. Replace every placeholder with real content: real words with accurate definitions, example sentences, part of speech, language of origin and difficulty (1-5).\n${JSON_RULES}`;
+        const exampleWord = (word, owner, extra = {}) => ({
+            word, definition: "A short, kid-friendly definition", sentence: `An example sentence that uses ${word}.`,
+            part_of_speech: "noun", language_of_origin: "Latin", alternate_pronunciations: "", difficulty: 2, ...extra, ...owner });
         const BLANK_TEMPLATE = {
             name: "My Spelling Bee", game_mode: "team", timer_duration_seconds: 90, elimination_mode: true,
-            teams: [{ name: "Team A", color: "#f59e0b", players: [{ name: "Player One", age: "11", grade: "6th", school: "", fun_fact: "" }] }],
+            teams: [
+                { name: "Team A", color: "#f59e0b", players: [
+                    { name: "Player One", age: "11", grade: "6th", school: "Lincoln Middle", fun_fact: "Something fun about them" },
+                    { name: "Player Two", age: "12", grade: "7th", school: "Lincoln Middle", fun_fact: "" }] },
+                { name: "Team B", color: "#3b82f6", players: [
+                    { name: "Player Three", age: "11", grade: "6th", school: "Roosevelt Elementary", fun_fact: "" }] }
+            ],
             players: [],
             words: [
-                { word: "example", definition: "", sentence: "", part_of_speech: "", language_of_origin: "", alternate_pronunciations: "", difficulty: 2, player_name: "Player One" },
-                { word: "example", definition: "", sentence: "", part_of_speech: "", language_of_origin: "", difficulty: 2, team_name: "Team A" },
-                { word: "example", definition: "", sentence: "", part_of_speech: "", language_of_origin: "", difficulty: 3 }
+                exampleWord("player-one-word", { player_name: "Player One" }),
+                exampleWord("player-two-word", { player_name: "Player Two" }),
+                exampleWord("team-a-pool-word", { team_name: "Team A" }),
+                exampleWord("team-b-pool-word", { team_name: "Team B" }),
+                exampleWord("shared-tiebreaker-word", {}, { difficulty: 4 })
             ]
         };
 
@@ -698,37 +733,110 @@ IMPORTANT: your JSON replaces the whole setup. Include EVERY team, player and wo
         document.getElementById('btn-open-roster-import').onclick = () => toggleForm('roster-import-form', true);
         document.getElementById('btn-cancel-roster-import').onclick = () => toggleForm('roster-import-form', false);
 
-        document.getElementById('btn-roster-import').onclick = async () => {
-            const resultEl = document.getElementById('roster-result');
-            const raw = document.getElementById('roster-json').value;
-            let data;
-            try { data = parseLooseJson(raw); }
-            catch (e) { return alert('Could not find valid JSON: ' + e.message); }
+        // Preview, confirm any removals, then apply. Returns the result, or null if cancelled/failed.
+        async function applyRoster(data, { mode = 'replace', resultEl }) {
             try {
-                // Preview first; replacing can delete entries the JSON left out
-                const preview = await api.importSession(currentSession.id, data, { dryRun: true });
-                const r = preview.removed_names;
-                const removedCount = r.teams.length + r.players.length + r.words.length;
-                if (removedCount || preview.turns_removed) {
-                    const list = (label, names) => names.length ? `\n${label} (${names.length}): ${names.slice(0, 15).join(', ')}${names.length > 15 ? ', …' : ''}` : '';
-                    const msg = `This JSON leaves out entries that are in the session now. Importing will REMOVE:` +
-                        list('Teams', r.teams) + list('Players', r.players) + list('Words', r.words) +
-                        (preview.turns_removed ? `\n\n⚠ ${preview.turns_removed} recorded turn(s) for these will be deleted too.` : '') +
-                        `\n\nIt will also add ${fmtCounts(preview.created)} and update ${fmtCounts(preview.updated)}. Continue?`;
-                    if (!confirm(msg)) return;
+                if (mode === 'replace') {
+                    const preview = await api.importSession(currentSession.id, data, { dryRun: true });
+                    const r = preview.removed_names;
+                    if (r.teams.length + r.players.length + r.words.length || preview.turns_removed) {
+                        const list = (label, names) => names.length ? `\n${label} (${names.length}): ${names.slice(0, 15).join(', ')}${names.length > 15 ? ', …' : ''}` : '';
+                        const msg = `This JSON leaves out entries that are in the session now. Saving will REMOVE:` +
+                            list('Teams', r.teams) + list('Players', r.players) + list('Words', r.words) +
+                            (preview.turns_removed ? `\n\n⚠ ${preview.turns_removed} recorded turn(s) for these will be deleted too.` : '') +
+                            `\n\nIt will also add ${fmtCounts(preview.created)} and update ${fmtCounts(preview.updated)}. Continue?`;
+                        if (!confirm(msg)) return null;
+                    }
                 }
-                const res = await api.importSession(currentSession.id, data);
-                resultEl.className = `mt-3 text-sm p-3 rounded border ${res.warnings.length ? 'bg-amber-50 border-amber-300' : 'bg-green-50 border-green-300'}`;
-                resultEl.innerHTML = `<b>Imported.</b> Created ${fmtCounts(res.created)}. Updated ${fmtCounts(res.updated)}. Removed ${fmtCounts(res.removed)}.${res.session_updated ? ' Session settings updated.' : ''}` +
+                const res = await api.importSession(currentSession.id, data, { mode });
+                resultEl.className = `text-sm p-3 rounded border ${res.warnings.length ? 'bg-amber-50 border-amber-300' : 'bg-green-50 border-green-300'} ${resultEl.dataset.spacing || ''}`;
+                resultEl.innerHTML = `<b>Saved.</b> Created ${fmtCounts(res.created)}. Updated ${fmtCounts(res.updated)}.` +
+                    (mode === 'replace' ? ` Removed ${fmtCounts(res.removed)}.` : '') + (res.session_updated ? ' Session settings updated.' : '') +
                     (res.warnings.length ? `<ul class="list-disc ml-5 mt-1">${res.warnings.map(w => `<li>${w}</li>`).join('')}</ul>` : '');
+                await window.selectSession(currentSession.id); // game mode / settings may have changed
+                return res;
+            } catch (e) {
+                resultEl.className = `text-sm p-3 rounded border bg-red-50 border-red-300 ${resultEl.dataset.spacing || ''}`;
+                resultEl.textContent = 'Save failed: ' + e.message;
+                return null;
+            }
+        }
+
+        const setJson = (id, value) => { document.getElementById(id).value = JSON.stringify(value, null, 2); };
+        const confirmOverwrite = (id) => !document.getElementById(id).value.trim() || confirm('Replace what is in the box?');
+
+        // Whole-session import
+        document.getElementById('btn-roster-load-current').onclick = async () => {
+            if (confirmOverwrite('roster-json')) setJson('roster-json', await api.exportSession(currentSession.id));
+        };
+        document.getElementById('btn-roster-load-example').onclick = () => {
+            if (confirmOverwrite('roster-json')) setJson('roster-json', { ...BLANK_TEMPLATE, name: currentSession.name });
+        };
+        document.getElementById('btn-roster-import').onclick = async () => {
+            let data;
+            try { data = parseLooseJson(document.getElementById('roster-json').value); }
+            catch (e) { return alert('Could not find valid JSON: ' + e.message); }
+            const resultEl = document.getElementById('roster-result');
+            resultEl.dataset.spacing = 'mt-3';
+            if (await applyRoster(data, { resultEl })) {
                 document.getElementById('roster-json').value = '';
                 toggleForm('roster-import-form', false);
-                await window.selectSession(currentSession.id); // game mode may have changed
-            } catch (e) {
-                resultEl.className = 'mt-3 text-sm p-3 rounded border bg-red-50 border-red-300';
-                resultEl.textContent = 'Import failed: ' + e.message;
             }
         };
+
+        // --- Bulk edit panels (players / words): a flat JSON list, saved through the session import ---
+        // Players are flattened with "team_name" (easier to edit than nesting inside teams).
+        async function currentPlayersJson() {
+            const exp = await api.exportSession(currentSession.id);
+            return [...exp.teams.flatMap(t => t.players.map(p => ({ ...p, team_name: t.name }))), ...exp.players];
+        }
+        function examplePlayersJson() {
+            const team = teamMode() ? teams[0]?.name || 'Team A' : null;
+            return [
+                { name: "New Player", age: "11", grade: "6th", school: "Lincoln Middle", fun_fact: "Something fun about them", ...(team ? { team_name: team } : {}) },
+                ...(teamMode() && teams[1] ? [{ name: "Another Player", grade: "7th", team_name: teams[1].name }] : [{ name: "Another Player", grade: "7th" }])
+            ];
+        }
+        function exampleWordsJson() {
+            const p = players[0]?.name || 'Player One';
+            return [
+                exampleWord("player-word", { player_name: p }),
+                ...(teamMode() ? [exampleWord("team-pool-word", { team_name: teams[0]?.name || 'Team A' })] : []),
+                exampleWord("shared-pool-word", {}, { difficulty: 3 })
+            ];
+        }
+
+        function setupBulkPanel(key, { loadCurrent, loadExample }) {
+            const box = `${key}-bulk-json`;
+            const resultEl = document.getElementById(`${key}-bulk-result`);
+            resultEl.dataset.spacing = 'mb-3';
+            document.getElementById(`btn-${key}-bulk`).onclick = async () => {
+                toggleForm(`${key}-bulk-form`, true);
+                if (!document.getElementById(box).value.trim()) setJson(box, await loadCurrent()); // start from what's there
+            };
+            document.getElementById(`btn-${key}-cancel`).onclick = () => toggleForm(`${key}-bulk-form`, false);
+            document.getElementById(`btn-${key}-load-current`).onclick = async () => { if (confirmOverwrite(box)) setJson(box, await loadCurrent()); };
+            document.getElementById(`btn-${key}-load-example`).onclick = () => { if (confirmOverwrite(box)) setJson(box, loadExample()); };
+            document.getElementById(`btn-${key}-copy`).onclick = (e) => copyToClipboard(document.getElementById(box).value, e.currentTarget, 'Copied!');
+            const save = async (mode) => {
+                let list;
+                try {
+                    const raw = document.getElementById(box).value;
+                    const start = raw.search(/[\[{]/);
+                    list = JSON.parse(raw.slice(start, Math.max(raw.lastIndexOf(']'), raw.lastIndexOf('}')) + 1));
+                } catch (e) { return alert('Could not find valid JSON: ' + e.message); }
+                if (!Array.isArray(list)) list = list[key]; // also accept {"players": [...]} / {"words": [...]}
+                if (!Array.isArray(list)) return alert(`Expected a JSON list of ${key}.`);
+                if (await applyRoster({ [key]: list }, { mode, resultEl })) {
+                    document.getElementById(box).value = '';
+                    toggleForm(`${key}-bulk-form`, false);
+                }
+            };
+            document.getElementById(`btn-${key}-save`).onclick = () => save('replace');
+            document.getElementById(`btn-${key}-add`).onclick = () => save('merge');
+        }
+        setupBulkPanel('players', { loadCurrent: currentPlayersJson, loadExample: examplePlayersJson });
+        setupBulkPanel('words', { loadCurrent: async () => (await api.exportSession(currentSession.id)).words, loadExample: exampleWordsJson });
 
         // --- New session: fill-in form or full JSON definition ---
         function setNewSessionTab(tab) {
@@ -741,6 +849,9 @@ IMPORTANT: your JSON replaces the whole setup. Include EVERY team, player and wo
         document.getElementById('tab-new-manual').onclick = () => setNewSessionTab('manual');
         document.getElementById('tab-new-json').onclick = () => setNewSessionTab('json');
         document.getElementById('btn-cancel-session-json').onclick = () => toggleForm('new-session-form', false);
+        document.getElementById('btn-new-load-example').onclick = () => {
+            if (confirmOverwrite('new-session-json')) setJson('new-session-json', BLANK_TEMPLATE);
+        };
         document.getElementById('btn-copy-template').onclick = (e) =>
             copyToClipboard(`${TEMPLATE_INSTRUCTIONS}\n\n${JSON.stringify(BLANK_TEMPLATE, null, 2)}\n\nWhat I want: `, e.currentTarget, 'Copied! Paste into your AI');
 
