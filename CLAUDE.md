@@ -8,7 +8,7 @@ A two-screen spelling bee app. Three static pages talk to one FastAPI backend:
 
 - **`setup.html`** (laptop): CRUD for sessions, teams, players, and words over REST.
 - **`control.html`** (phone, the "judge"): picks the player (or the team, in a team game) and the word, runs the timer, reveals hints, marks results. It sends WebSocket commands.
-- **`display.html`** (TV): passive. It renders whatever state the server broadcasts and plays sounds and speech. It needs a click on "Click to start" first, because browsers only allow audio and speech after a user gesture. The spelling view currently shows the word itself, in large text for the audience.
+- **`display.html`** (TV): passive. It renders whatever state the server broadcasts and plays sounds and speech. It needs a click on "Click to start" first, because browsers only allow audio and speech after a user gesture. The spelling view shows the word in large text, unless the controller's hide toggle (`hide_word`) is on, in which case it shows only the first letter, a blurred placeholder and the definition.
 
 The display and controller both take `?session=ID`, which Setup's copy-link buttons generate. The display needs it. The controller uses it to preselect and open the session, and falls back to its dropdown without it.
 
@@ -134,6 +134,8 @@ Both modes share the same frontend pages, which branch on `game_mode`: the contr
 - **Timer ticks must not redraw views.** Each tick broadcasts the full state, so `display.html` (`lastViewKey`) and `control.html` (`lastListKey`) compare the state minus `timer_*` and skip re-rendering when only the timer changed. `switchView` replays the entrance animation only when the screen actually changes. Without this the TV flashes every second. Keep any new per-tick field out of those keys.
 - **Timer length** is `Session.timer_duration_seconds`. It's edited in Setup or with the controller's −15s/+15s, which also sends `RESET_TIMER {duration}`, and that sets `GameState.timer_duration`. `_sync_session_settings` re-reads it, along with `game_mode`, on connect and on `CLEAR_DISPLAY`. The TV's bar colors are percentages of `timer_duration`, so it must match the session.
 - **Judging** (`MARK_CORRECT/INCORRECT/TIMEOUT`) saves the turn server-side and is ignored if the word on screen already has a result, so double taps and a late auto-timeout can't count twice. `state.last_turn` holds the latest judged turn. `UNDO_RESULT` deletes it and puts its team/player and word back in `spelling` mode. `state.data_version` goes up whenever turns change; the controller refetches words/teams/players when it does. Result and scoreboard broadcasts carry `scoreboard`, `team_scoreboard` and `winner`.
+- **Editing past turns:** the controller's ⋯ menu on a scored word sends `EDIT_TURN {turn_id, round_number?, result?}` or `DELETE_TURN {turn_id}`. They go through `edit_turn()`/`delete_turn()` and `rederive_elimination()` in `routes/turns.py` (REST: `PATCH`/`DELETE /turns/{id}`), then refresh `round_done` and bump `data_version`.
+- **`hide_word`** lives in `GameState` only (memory). The controller keeps the choice in `localStorage` and re-sends `SET_HIDE_WORD` whenever a state update disagrees, so a server restart can't reveal words.
 - `display_mode` is one of `idle | player_intro | team_intro | spelling | result | scoreboard`, and drives which view `display.html` shows.
 - When the controller reveals a hint, the display also speaks it. `speakNewHints` diffs `revealed_info` for the same word.
 

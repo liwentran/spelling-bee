@@ -63,6 +63,9 @@
             </div>
         </div>
 
+        <!-- What the TV shows of the word: all of it, or only the first letter + definition -->
+        <button id="btn-hide-word" class="w-full bg-gray-800 border border-gray-600 py-3 rounded-xl text-lg font-semibold active:scale-95 transition-transform"></button>
+
         <!-- Pronounce -->
         <button id="btn-pronounce" disabled class="w-full bg-purple-700 hover:bg-purple-600 py-4 rounded-xl text-2xl font-bold shadow-lg active:scale-95 transition-transform disabled:opacity-40 disabled:active:scale-100">🔊 Pronounce Word</button>
 
@@ -119,6 +122,9 @@
         </div>
     </div>
 
+    <!-- ⋯ menu for a scored word (bottom sheet) -->
+    <div id="turn-menu" onclick="window.closeTurnMenu()" class="hidden fixed inset-0 bg-black/70 z-30 flex items-end"></div>
+
     <script type="module">
         import * as api from './js/api.js';
         import * as ws from './js/ws.js';
@@ -128,9 +134,14 @@
         let players = [];
         let teams = [];
         let words = [];
+        let turns = []; // judged attempts, for the round/result tag and ⋯ menu on used words
         let gameMode = 'individual'; // individual, team (from session; server state is authoritative)
         let selectedPlayerId = null;
         let selectedTeamId = null; // team mode only
+        // Hide the word on the TV (first letter + definition only). Saved on this phone and
+        // re-sent whenever the server disagrees, so a server restart doesn't reveal words.
+        let hideWord = false;
+        try { hideWord = localStorage.getItem('hideWord') === '1'; } catch (e) {}
         let lastDataVersion = null;
         let latestWinner = null; // elimination winner, sent with result/scoreboard broadcasts
         let wordTab = 'player'; // player (or team's, in team mode), pool, all
@@ -182,6 +193,7 @@
                         dom.main.classList.remove('hidden');
                         players = await api.fetchPlayers(sid);
                         words = await api.fetchWords(sid);
+                        turns = await api.fetchTurns(sid);
                         teams = await api.fetchTeams(sid);
 
                         // Get session details for timer duration
@@ -260,6 +272,7 @@
             });
 
             document.getElementById('btn-pronounce').disabled = !s.current_word_id;
+            if (!!s.hide_word !== hideWord) ws.setHideWord(hideWord);
 
             // Judge once per word; Undo reopens it
             const owner = gameMode === 'team' ? s.current_team_id : s.current_player_id;
@@ -289,7 +302,7 @@
             const sid = dom.select.value;
             if (!sid) return;
             try {
-                [words, players, teams] = await Promise.all([api.fetchWords(sid), api.fetchPlayers(sid), api.fetchTeams(sid)]);
+                [words, players, teams, turns] = await Promise.all([api.fetchWords(sid), api.fetchPlayers(sid), api.fetchTeams(sid), api.fetchTurns(sid)]);
                 renderPlayers();
                 renderWords();
                 renderRoundStatus();
@@ -469,9 +482,77 @@
                         ${p ? `<div class="text-xs text-blue-400">${p.name}</div>` : ''}
                         ${team ? `<div class="text-xs" style="color: ${teamColor(team.color)}">Team ${team.name}</div>` : ''}
                     </div>
-                    ${isUsed ? '<span class="text-xs bg-gray-600 px-2 py-1 rounded">Used</span>' : ''}
+                    ${usedTag(w)}
                 </div>`;
             }).join('');
+        }
+
+        // Latest judged attempt on a word (a word can be re-asked), shown as "R1 · ✅ Red" with a ⋯ menu
+        const RESULT_ICON = { correct: '✅', incorrect: '❌', timeout: '⏰' };
+        const latestTurn = (wordId) => turns.filter(t => t.word_id === wordId).at(-1);
+        const turnOwnerName = (t) => (t.team_id ? findTeam(t.team_id) : players.find(p => p.id === t.player_id))?.name || '';
+
+        function usedTag(w) {
+            const t = latestTurn(w.id);
+            if (!t) return w.used ? '<span class="text-xs bg-gray-600 px-2 py-1 rounded">Used</span>' : '';
+            return `<div class="flex items-center gap-1 flex-shrink-0">
+                <span class="text-xs bg-gray-600 text-gray-200 px-2 py-1 rounded whitespace-nowrap">R${t.round_number} · ${RESULT_ICON[t.result] || ''} ${turnOwnerName(t)}</span>
+                <button onclick="event.stopPropagation(); window.openTurnMenu('${t.id}')" class="text-white text-2xl leading-none px-3 py-1 rounded hover:bg-gray-600" aria-label="Edit score">⋯</button>
+            </div>`;
+        }
+
+        // ⋯ menu: move a scored word to another round, change its result, or remove the score
+        let turnDraft = null;
+        window.openTurnMenu = (turnId) => {
+            const t = turns.find(x => x.id === turnId);
+            if (!t) return;
+            turnDraft = { id: t.id, round_number: t.round_number, result: t.result, word: words.find(w => w.id === t.word_id)?.word || '', owner: turnOwnerName(t) };
+            renderTurnMenu();
+        };
+        window.closeTurnMenu = () => { turnDraft = null; renderTurnMenu(); };
+        window.turnMenuRound = (delta) => { turnDraft.round_number = Math.max(1, turnDraft.round_number + delta); renderTurnMenu(); };
+        window.turnMenuResult = (result) => { turnDraft.result = result; renderTurnMenu(); };
+        window.saveTurnMenu = () => {
+            ws.editTurn(turnDraft.id, { round_number: turnDraft.round_number, result: turnDraft.result });
+            window.closeTurnMenu();
+        };
+        window.removeTurnScore = () => {
+            if (!confirm(`Remove the score for "${turnDraft.word}"? The word goes back to unused.`)) return;
+            ws.deleteTurn(turnDraft.id);
+            window.closeTurnMenu();
+        };
+
+        function renderTurnMenu() {
+            const el = document.getElementById('turn-menu');
+            el.classList.toggle('hidden', !turnDraft);
+            if (!turnDraft) return;
+            const d = turnDraft;
+            const resultBtn = (r, label, color) => `<button onclick="window.turnMenuResult('${r}')" class="flex-1 py-3 rounded-lg font-bold ${d.result === r ? color + ' text-white' : 'bg-gray-700 text-gray-300'}">${label}</button>`;
+            el.innerHTML = `
+            <div onclick="event.stopPropagation()" class="w-full bg-gray-900 border-t border-gray-600 rounded-t-2xl p-5 space-y-5">
+                <div>
+                    <div class="text-2xl font-bold">${d.word}</div>
+                    <div class="text-sm text-gray-400">${d.owner}</div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-400">Round</span>
+                    <div class="flex items-center gap-3">
+                        <button onclick="window.turnMenuRound(-1)" class="bg-gray-700 w-12 h-12 rounded-lg text-2xl font-bold">−</button>
+                        <span class="font-mono text-2xl font-bold w-10 text-center">${d.round_number}</span>
+                        <button onclick="window.turnMenuRound(1)" class="bg-gray-700 w-12 h-12 rounded-lg text-2xl font-bold">+</button>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    ${resultBtn('correct', '✅ Correct', 'bg-green-600')}
+                    ${resultBtn('incorrect', '❌ Incorrect', 'bg-red-600')}
+                    ${resultBtn('timeout', '⏰ Timeout', 'bg-orange-600')}
+                </div>
+                <button onclick="window.saveTurnMenu()" class="w-full bg-yellow-500 text-black py-4 rounded-xl text-xl font-bold">Save</button>
+                <div class="flex gap-3">
+                    <button onclick="window.removeTurnScore()" class="flex-1 bg-gray-800 border border-red-500 text-red-400 py-3 rounded-lg font-semibold">Remove score</button>
+                    <button onclick="window.closeTurnMenu()" class="flex-1 bg-gray-700 py-3 rounded-lg font-semibold">Cancel</button>
+                </div>
+            </div>`;
         }
 
         window.selectWord = (id) => {
@@ -545,6 +626,19 @@
             updateTimerDisplay();
         };
         document.getElementById('btn-pronounce').onclick = () => ws.pronounceWord();
+        const hideBtn = document.getElementById('btn-hide-word');
+        const renderHideBtn = () => {
+            hideBtn.textContent = hideWord ? '🙈 TV: first letter + definition only' : '👁 TV: showing the whole word';
+            hideBtn.classList.toggle('border-yellow-500', hideWord);
+            hideBtn.classList.toggle('text-yellow-300', hideWord);
+        };
+        hideBtn.onclick = () => {
+            hideWord = !hideWord;
+            try { localStorage.setItem('hideWord', hideWord ? '1' : '0'); } catch (e) {}
+            renderHideBtn();
+            ws.setHideWord(hideWord);
+        };
+        renderHideBtn();
         document.getElementById('btn-scoreboard').onclick = ws.showScoreboard;
         document.getElementById('btn-next-round').onclick = () => {
             const isTeam = gameMode === 'team';

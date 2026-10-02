@@ -1,6 +1,6 @@
 import json
 from typing import Dict, Set, Any, Optional
-from fastapi import WebSocket
+from fastapi import WebSocket, HTTPException
 from sqlmodel import Session as DbSession, select
 from database import get_engine
 from sqlmodel import Session as SQLSession
@@ -16,6 +16,7 @@ class GameState:
         self.timer_seconds_remaining: int = 0
         self.timer_duration: int = 120
         self.revealed_info: set = set()
+        self.hide_word: bool = False  # TV shows only the first letter (+ definition); the controller re-sends its saved choice
         self.display_mode: str = 'idle'  # idle, player_intro, team_intro, spelling, result, scoreboard
         self.result: Optional[str] = None  # correct, incorrect, timeout
         self.round_number: int = 1  # mirrors Session.current_round (saved on NEXT_ROUND)
@@ -37,6 +38,7 @@ class GameState:
             "timer_seconds_remaining": self.timer_seconds_remaining,
             "timer_duration": self.timer_duration,
             "revealed_info": list(self.revealed_info),
+            "hide_word": self.hide_word,
             "display_mode": self.display_mode,
             "result": self.result,
             "round_number": self.round_number,
@@ -173,6 +175,30 @@ def _undo_last_turn(state: "GameState", session_id: str):
     state.last_turn = None
     state.result = None
     state.timer_running = False
+    state.data_version += 1
+
+
+def _change_turn(state: "GameState", session_id: str, command: dict):
+    """EDIT_TURN (new round/result) or DELETE_TURN on any past turn, from the controller's word menu."""
+    from models import Turn
+    from routes.turns import edit_turn, delete_turn
+    with SQLSession(get_engine()) as session:
+        turn = session.get(Turn, command.get("turn_id"))
+        if not turn or turn.session_id != session_id:
+            return
+        is_last = bool(state.last_turn and state.last_turn["id"] == turn.id)
+        if command["type"] == "DELETE_TURN":
+            delete_turn(session, turn)
+            if is_last:
+                state.last_turn = None
+        else:
+            edit_turn(session, turn, command.get("round_number"), command.get("result"))
+            if is_last:
+                state.last_turn = {**state.last_turn, "result": turn.result}
+                if state.result and state.current_word_id == turn.word_id:
+                    state.result = turn.result  # the TV's result screen shows the correction
+        session.commit()
+        _refresh_round_done(state, session, session_id)
     state.data_version += 1
 
 
@@ -323,6 +349,9 @@ class ConnectionManager:
             if info_type:
                 state.revealed_info.add(info_type)
 
+        elif cmd_type == "SET_HIDE_WORD":
+            state.hide_word = bool(command.get("hide"))
+
         elif cmd_type == "HIDE_INFO":
             info_type = command.get("info_type")
             if info_type in state.revealed_info:
@@ -346,6 +375,12 @@ class ConnectionManager:
 
         elif cmd_type == "SHOW_PLAYER_INTRO":
             state.display_mode = "player_intro"
+
+        elif cmd_type in ("EDIT_TURN", "DELETE_TURN"):
+            try:
+                _change_turn(state, session_id, command)
+            except HTTPException:
+                return  # invalid round/result: ignore
 
         elif cmd_type == "NEXT_ROUND":
             # Saved to the session so a restart or redeploy keeps the round; the TV shows the new round

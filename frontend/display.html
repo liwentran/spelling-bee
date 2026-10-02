@@ -354,7 +354,14 @@
                     document.getElementById('spell-round').textContent = `Round ${s.round_number}`;
 
                     if (word) {
-                        document.getElementById('spell-word').textContent = word.word;
+                        const wordEl = document.getElementById('spell-word');
+                        if (s.hide_word) {
+                            // First letter only; the rest is a blurred placeholder of the same length
+                            const rest = '•'.repeat(Math.max(word.word.length - 1, 0));
+                            wordEl.innerHTML = `${esc(word.word.charAt(0))}<span class="select-none" style="filter: blur(0.12em); opacity: 0.6" aria-hidden="true">${rest}</span>`;
+                        } else {
+                            wordEl.textContent = word.word;
+                        }
 
                         const revInfo = document.getElementById('revealed-info');
                         revInfo.innerHTML = '';
@@ -363,7 +370,8 @@
                         const infoClass = "bg-gray-800/80 p-4 rounded-xl border border-gray-600 text-2xl w-full text-center slide-up shadow-lg";
                         const smallClass = "bg-gray-800/50 px-6 py-2 rounded-full border border-gray-700 text-xl inline-block mx-2 slide-up";
 
-                        if (revealedInfo.includes('definition') && word.definition) {
+                        // Hidden-word mode always shows the definition
+                        if ((s.hide_word || revealedInfo.includes('definition')) && word.definition) {
                             revInfo.innerHTML += `<div class="${infoClass}">📖 ${word.definition}</div>`;
                         }
                         if (revealedInfo.includes('sentence') && word.sentence) {

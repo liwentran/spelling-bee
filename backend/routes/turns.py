@@ -8,6 +8,12 @@ from scoring import compute_scoreboard
 
 router = APIRouter(prefix="/api/sessions/{session_id}/turns", tags=["turns"])
 
+RESULTS = ("correct", "incorrect", "timeout")
+
+class TurnUpdate(BaseModel):
+    round_number: Optional[int] = None
+    result: Optional[str] = None
+
 class TurnCreate(BaseModel):
     player_id: Optional[str] = None  # required in individual mode; optional speller in team mode
     team_id: Optional[str] = None  # required in team mode
@@ -49,21 +55,39 @@ def delete_turn(db: DbSession, turn: Turn):
     session = db.get(Session, turn.session_id)
     db.delete(turn)
     db.flush()
-    others = db.exec(select(Turn).where(Turn.session_id == turn.session_id)).all()
-
     word = db.get(Word, turn.word_id)
     if word:
-        word.used = any(t.word_id == word.id for t in others)
+        word.used = db.exec(select(Turn).where(Turn.word_id == word.id)).first() is not None
+    rederive_elimination(db, session, turn.team_id, turn.player_id)
 
-    # Eliminated status is re-derived from the remaining misses, so undo never strands anyone
+
+def edit_turn(db: DbSession, turn: Turn, round_number: Optional[int] = None, result: Optional[str] = None):
+    """Correct a judged attempt's round or result after the fact. Caller commits."""
+    if result is not None:
+        if result not in RESULTS:
+            raise HTTPException(status_code=400, detail=f"result must be one of {', '.join(RESULTS)}")
+        turn.result = result
+    if round_number is not None:
+        if round_number < 1:
+            raise HTTPException(status_code=400, detail="round_number must be at least 1")
+        turn.round_number = round_number
+    db.flush()
+    rederive_elimination(db, db.get(Session, turn.session_id), turn.team_id, turn.player_id)
+
+
+def rederive_elimination(db: DbSession, session: Session, team_id: Optional[str], player_id: Optional[str]):
+    """Set the turn owner's eliminated status from their remaining misses, so undo/edit never strands anyone."""
     if session.game_mode == "team":
-        loser, misses = db.get(Team, turn.team_id) if turn.team_id else None, [t for t in others if t.team_id == turn.team_id]
+        owner = db.get(Team, team_id) if team_id else None
+        owner_turns = db.exec(select(Turn).where(Turn.team_id == team_id)).all() if owner else []
     else:
-        loser, misses = db.get(Player, turn.player_id) if turn.player_id else None, [t for t in others if t.player_id == turn.player_id]
-    if loser and loser.eliminated:
-        misses = [t for t in misses if t.result != "correct"]
-        loser.eliminated = bool(session.elimination_mode and misses)
-        loser.elimination_round = min(t.round_number for t in misses) if loser.eliminated else None
+        owner = db.get(Player, player_id) if player_id else None
+        owner_turns = db.exec(select(Turn).where(Turn.player_id == player_id)).all() if owner else []
+    if not owner:
+        return
+    misses = [t for t in owner_turns if t.result != "correct"]
+    owner.eliminated = bool(session.elimination_mode and misses)
+    owner.elimination_round = min(t.round_number for t in misses) if owner.eliminated else None
 
 
 @router.post("/")
@@ -73,6 +97,17 @@ def record_turn(session_id: str, turn_data: TurnCreate, db: DbSession = Depends(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     turn = save_turn(db, session, turn_data)
+    db.commit()
+    db.refresh(turn)
+    return turn
+
+
+@router.patch("/{turn_id}")
+def update_turn(session_id: str, turn_id: str, data: TurnUpdate, db: DbSession = Depends(get_session)):
+    turn = db.get(Turn, turn_id)
+    if not turn or turn.session_id != session_id:
+        raise HTTPException(status_code=404, detail="Turn not found")
+    edit_turn(db, turn, data.round_number, data.result)
     db.commit()
     db.refresh(turn)
     return turn

@@ -71,7 +71,9 @@ Judging saves the turn and marks the word **Used** (greyed out), so it isn't pic
 
 Then go back to step 1. Teams or players who have already gone this round get a **✓**, and the line under the list reads e.g. *Round 2 · 1 of 3 teams done*.
 
-> **Heads-up:** the spelling screen shows the word in large text for the audience. Seat spellers facing away from the TV.
+**Fixing an older score:** every word that has been judged shows its round, result and who spelled it, e.g. **R1 · ❌ Red**. Tap the **⋯** next to it to move it to another round, change it to ✅ Correct / ❌ Incorrect / ⏰ Timeout, or **Remove score** (the word goes back to unused). Then tap **Save**. Scores, eliminations and round progress update to match.
+
+> **Hiding the word:** by default the spelling screen shows the whole word in large text for the audience. Tap **👁 TV: showing the whole word** on the controller to switch to **🙈 TV: first letter + definition only**, so spellers can face the TV. The phone remembers the choice, and the TV shows the full word again on the result screen.
 
 ### 4. Between rounds and at the end
 
