@@ -97,7 +97,7 @@ A **round** is one word for each team (or player) still in the game. When everyo
 
 - 🖥️ **TV-optimized display** with large text, animations, and traffic light timer
 - 📱 **Phone-controlled** with touch-friendly buttons
-- 🔊 **Sound effects** (bell for incorrect, chime for correct, time-left beeps every 30 seconds, ticking countdown)
+- 🔊 **Sound effects** (bell for incorrect, a kids' "Yay!" cheer for correct, time-left beeps every 30 seconds, ticking countdown)
 - 📝 **Custom words** per player with definitions, sentences, part of speech, origin
 - 🎮 **Full control** over which word to display, when to reveal info, when to judge
 - 🔄 **Sessions** — create, reset, and manage multiple games
@@ -230,3 +230,7 @@ Every JSON box in Setup has a **📄 Load example** button: Bulk Edit (players a
 | `make deploy` | Pull `origin/main` on the droplet and rebuild the container |
 | `make logs` | Tail the deployed container's logs |
 | `make restart` | Restart the deployed container |
+
+## Credits
+
+- Correct-answer cheer (`frontend/sounds/kids-yay.mp3`): "Children Screaming Yay" by [Free Sounds Library](https://www.freesoundslibrary.com/children-screaming-yay-sound-effect/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

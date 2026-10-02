@@ -82,6 +82,10 @@ function beeps(count) {
     };
 }
 
+// Sounds that are real recordings instead of synthesized (the synthesized design stays as the fallback).
+// kids-yay.mp3: "Children Screaming Yay" by Free Sounds Library (freesoundslibrary.com), CC BY 4.0.
+const RECORDINGS = { correct: new URL('../sounds/kids-yay.mp3', import.meta.url).href };
+
 // name -> [draw, seconds]
 const SOUNDS = { bell: [bell, 1.6], correct: [correct, 0.8], tick: [tick, 0.05], countdown: [countdown, 0.08] };
 for (let n = 1; n <= MAX_BEEPS; n++) SOUNDS[`beeps${n}`] = [beeps(n), n * 0.35 + 0.1];
@@ -107,6 +111,12 @@ function toWav(buffer) {
 
 const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
 const clipsReady = Promise.all(Object.entries(SOUNDS).map(async ([name, [draw, seconds]]) => {
+    if (RECORDINGS[name]) {
+        const audio = new Audio(RECORDINGS[name]);
+        audio.preload = 'auto';
+        clips[name] = audio;
+        return;
+    }
     if (!Offline) return;
     const ctx = new Offline(1, Math.ceil(seconds * SAMPLE_RATE), SAMPLE_RATE);
     draw(ctx, 0);
