@@ -51,7 +51,10 @@
         <!-- Words -->
         <div>
             <div class="flex justify-between items-end mb-2">
-                <h3 class="text-sm text-gray-400 uppercase tracking-wide">Select Word</h3>
+                <div class="flex items-center gap-2">
+                    <h3 class="text-sm text-gray-400 uppercase tracking-wide">Select Word</h3>
+                    <button id="btn-random-word" class="bg-purple-700 hover:bg-purple-600 px-2.5 py-1 rounded text-sm font-semibold active:scale-95 transition-transform" title="Pick an unused word from this list">🎲 Random</button>
+                </div>
                 <div class="flex space-x-2 text-sm bg-gray-800 rounded p-1">
                     <button id="tab-player-words" class="px-2 py-1 rounded bg-gray-700">Player's</button>
                     <button id="tab-pool-words" class="px-2 py-1 rounded">Pool</button>
@@ -488,7 +491,8 @@
             renderWords();
         };
 
-        function renderWords() {
+        // Words on the current tab (Player's/Team's, Pool or All)
+        function visibleWords() {
             let filtered = words;
             if (wordTab === 'player' && gameMode === 'team') {
                 // Team's pool plus every member's own words
@@ -501,7 +505,11 @@
             } else if (wordTab === 'pool') {
                 filtered = words.filter(w => !w.player_id && !w.team_id);
             }
+            return filtered;
+        }
 
+        function renderWords() {
+            const filtered = visibleWords();
             if (filtered.length === 0) {
                 dom.wordList.innerHTML = `<div class="text-center text-gray-500 py-4">No words found</div>`;
                 return;
@@ -599,6 +607,18 @@
                 </div>
             </div>`;
         }
+
+        // Random pick from the current tab, skipping words already spelled (Used) and the current word
+        document.getElementById('btn-random-word').onclick = () => {
+            if (wordTab === 'player' && !(gameMode === 'team' ? selectedTeamId : selectedPlayerId)) {
+                return alert(gameMode === 'team' ? 'Select a team first.' : 'Select a player first.');
+            }
+            const candidates = visibleWords().filter(w => !w.used && w.id !== state.current_word_id);
+            if (!candidates.length) {
+                return alert('Every word in this list has already been used. Try the Pool or All tab.');
+            }
+            window.selectWord(candidates[Math.floor(Math.random() * candidates.length)].id);
+        };
 
         window.selectWord = (id) => {
             ws.setActiveWord(id);

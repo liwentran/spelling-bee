@@ -9,6 +9,7 @@ from sqlmodel import Session as SQLSession
 class GameState:
     def __init__(self):
         self.game_mode: str = 'individual'  # individual, team (mirrors Session.game_mode)
+        self.elimination_mode: bool = False  # mirrors Session.elimination_mode (TV hides Active/Eliminated without it)
         self.current_team_id: Optional[str] = None  # team mode: the team at the mic
         self.current_player_id: Optional[str] = None  # team mode: optional highlighted speller
         self.current_word_id: Optional[str] = None
@@ -31,6 +32,7 @@ class GameState:
     def to_dict(self):
         return {
             "game_mode": self.game_mode,
+            "elimination_mode": self.elimination_mode,
             "current_team_id": self.current_team_id,
             "current_player_id": self.current_player_id,
             "current_word_id": self.current_word_id,
@@ -109,6 +111,7 @@ def _sync_session_settings(state: "GameState", session_id: str):
         if not sess:
             return
         state.game_mode = sess.game_mode
+        state.elimination_mode = sess.elimination_mode
         if not state.timer_running and state.timer_seconds_remaining in (0, state.timer_duration):
             state.timer_seconds_remaining = sess.timer_duration_seconds
         state.timer_duration = sess.timer_duration_seconds

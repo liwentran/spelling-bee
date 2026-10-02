@@ -85,3 +85,26 @@ export function playCountdown() {
     osc.start(audioCtx.currentTime);
     osc.stop(audioCtx.currentTime + 0.05);
 }
+
+// `count` short, clear beeps (used for "time left" markers: one beep per 30 seconds remaining)
+export function playBeeps(count) {
+    if (!audioCtx || count < 1) return;
+    for (let i = 0; i < count; i++) {
+        const start = audioCtx.currentTime + i * 0.35;
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, start);
+
+        gainNode.gain.setValueAtTime(0, start);
+        gainNode.gain.linearRampToValueAtTime(0.6, start + 0.01);
+        gainNode.gain.setValueAtTime(0.6, start + 0.15);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, start + 0.2);
+
+        osc.start(start);
+        osc.stop(start + 0.21);
+    }
+}

@@ -59,11 +59,11 @@ You need three screens. They don't have to be on the same device, but they must 
 | Step | Individual game | Team game | What the TV shows |
 |---|---|---|---|
 | 1. Call someone up | Tap **Next up: *name* ➡**, or tap any **player's name** under *Select Player* | Tap **Next up: *team* ➡**, or tap any **team** under *Select Team*. The whole team spells together as a chain, one letter each | "Up Next": the player's bio, or the team with a card for every member |
-| 2. Pick a word | Tab **Player's** (their words + their team's pool), **Pool**, or **All** → tap a word | Tab **Team's** (team pool + all members' words), **Pool**, or **All** → tap a word | The spelling screen with the word, the player/team name, and the round |
+| 2. Pick a word | Tab **Player's** (their words + their team's pool), **Pool**, or **All** → tap a word, or **🎲 Random** for an unused word from that tab | Tab **Team's** (team pool + all members' words), **Pool**, or **All** → tap a word, or **🎲 Random** | The spelling screen with the word, the player/team name, and the round |
 | 3. Say the word | Tap **🔊 Pronounce Word** (repeat as often as asked). **🐢 2× slower** and **🐌 3× slower** say it again, slowly | same | The TV speaks the word aloud |
-| 4. Start the clock | Tap **▶**. **⏸** pauses, **↺** resets. Change the length with **−15s / +15s** under *Time per word* (only while the clock is stopped; the change is saved for the session) | same | The timer bar runs along the bottom: green → yellow → red, ticking in the last 10 seconds |
+| 4. Start the clock | Tap **▶**. **⏸** pauses, **↺** resets. Change the length with **−15s / +15s** under *Time per word* (only while the clock is stopped; the change is saved for the session) | same | The timer bar runs along the bottom: green → yellow → red. Every 30 seconds it beeps once per 30 seconds left (3 beeps = 1:30 left, 2 = 1:00, 1 = 0:30), then ticks through the last 10 seconds |
 | 5. Answer questions | When the speller asks, tap **📖 Definition**, **📝 Sentence**, **🌍 Origin**, **🔤 Part of Speech** or **🔊 Alt. Pronunciations**. Tap again to hide it | same | The hint appears on screen and is read aloud |
-| 6. Judge | Tap **✅ CORRECT** or **❌ INCORRECT**. If the clock hits zero, **⏰ TIMEOUT** happens automatically | same | Who spelled, green confetti or red/orange with the correct spelling, and their running score |
+| 6. Judge | Tap **✅ CORRECT** or **❌ INCORRECT**. If the clock hits zero, **⏰ TIMEOUT** happens automatically | same | Who spelled, the whole screen turns green (with confetti), red, or orange for a timeout, with the correct spelling, and their running score |
 
 Judging saves the turn and marks the word **Used** (greyed out), so it isn't picked twice. Each word can be judged only once; the judge buttons grey out until you pick the next word. With Elimination Mode on, a miss eliminates the player, or in a team game the whole team. They then show crossed out on the controller.
 
@@ -84,7 +84,7 @@ Then go back to step 1. Teams or players who have already gone this round get a 
 
 A **round** is one word for each team (or player) still in the game. When everyone has gone, the controller says *Round N complete*.
 
-- **Scoreboard**: shows standings on the TV, ranked by words spelled correctly, then by fewest misses. Eliminated teams/players go to the bottom.
+- **Scoreboard**: shows standings on the TV, ranked by words spelled correctly, then by fewest misses. Eliminated teams/players go to the bottom. Team rows list their players in small text, and the Active/Eliminated labels only appear in elimination games.
 - **Next Round ➡**: starts the next round. The TV shows the new round number and the ✓ marks clear. If someone hasn't gone yet, it asks you first.
 - **Winning:** with Elimination Mode on, once only one team (or player) is left standing, the TV and the controller show **🏆 *name* wins!** Without elimination, play as many rounds as you like; the top of the scoreboard wins.
 - Scores and the round number are saved, so refreshing a screen or restarting the server doesn't lose the game.
@@ -95,11 +95,12 @@ A **round** is one word for each team (or player) still in the game. When everyo
 
 - 🖥️ **TV-optimized display** with large text, animations, and traffic light timer
 - 📱 **Phone-controlled** with touch-friendly buttons
-- 🔊 **Sound effects** (bell for incorrect, chime for correct, ticking countdown)
+- 🔊 **Sound effects** (bell for incorrect, chime for correct, time-left beeps every 30 seconds, ticking countdown)
 - 📝 **Custom words** per player with definitions, sentences, part of speech, origin
 - 🎮 **Full control** over which word to display, when to reveal info, when to judge
 - 🔄 **Sessions** — create, reset, and manage multiple games
 - 📊 **Scoreboard** with elimination tracking
+- 🔠 **Words always fit**: long words and names shrink to fit the TV
 - 👥 **Individual or team games**: team intros show every member, with team scoring and elimination
 - 🗣️ **Text-to-speech**: the TV pronounces the word and reads hints aloud as they're revealed
 - 🤖 **Sessions as JSON**: define a whole bee (settings, teams, players, words) in one JSON document. Have ChatGPT/Claude write or edit it, then paste it in
