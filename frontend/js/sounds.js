@@ -5,6 +5,9 @@
 // live AudioContext: Safari's auto-play settings and the iPhone/iPad silent switch can leave a live
 // AudioContext silent even after a click, while unlocked <audio> elements still play (like speech).
 // initAudio(), called from a click, unlocks every clip; a live AudioContext is kept as a fallback.
+//
+// Speech goes the same way: speak() plays an MP3 from /api/tts. Native speechSynthesis is only the
+// fallback, because Safari speaks it through the system voice, which AirPlay mirroring doesn't carry.
 
 const SAMPLE_RATE = 44100;
 const MAX_BEEPS = 10;
@@ -156,6 +159,12 @@ export function initAudio() {
         }).catch(() => { clip.muted = false; });
     });
 
+    // Unlock the speech player too, so it can play later without a gesture
+    voice.src = URL.createObjectURL(toWav({ getChannelData: () => new Float32Array(2205), sampleRate: 22050 }));
+    voice.muted = true;
+    unlocks.push(voice.play().then(() => { voice.pause(); voiceUnlocked = true; })
+        .catch(() => {}).finally(() => { voice.muted = false; }));
+
     // Live fallback
     try {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -172,6 +181,33 @@ export function initAudio() {
 export function audioState() {
     if (mediaUnlocked) return 'running';
     return audioCtx ? audioCtx.state : 'not-started';
+}
+
+// --- Speech ---
+
+const voice = new Audio();
+voice.preservesPitch = true; // slow speech stays at the normal pitch
+let voiceUnlocked = false;
+let speechId = 0;
+const ttsUrl = text => `/api/tts?text=${encodeURIComponent(text)}`;
+
+// Warm the cache (server and browser) so the first pronunciation starts right away
+export function prefetchSpeech(text) {
+    if (text) fetch(ttsUrl(text)).catch(() => {});
+}
+
+// Speak text at a speechSynthesis-style rate (1 = normal). If the clip can't play, call fallback(text, rate).
+export function speak(text, rate = 0.9, fallback = () => {}) {
+    if (!text) return;
+    const id = ++speechId; // a newer speak() cancels this one, including its fallback
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    const failed = () => { if (id === speechId) { speechId++; fallback(text, rate); } };
+    if (!voiceUnlocked) return failed();
+    voice.onerror = failed;
+    voice.src = ttsUrl(text);
+    voice.playbackRate = Math.max(0.25, Math.min(rate, 2));
+    voice.defaultPlaybackRate = voice.playbackRate;
+    voice.play().catch(failed);
 }
 
 export const whenReady = () => clipsReady;

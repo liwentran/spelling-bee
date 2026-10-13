@@ -189,7 +189,10 @@
             }
         }
 
-        function speak(text, rate = 0.9) {
+        // Speech plays as an audio clip (it reaches AirPlay); native speech is the fallback
+        const speak = (text, rate = 0.9) => sounds.speak(text, rate, speakNative);
+
+        function speakNative(text, rate = 0.9) {
             if (!text || !('speechSynthesis' in window)) return;
             const synth = window.speechSynthesis;
             synth.cancel();
@@ -292,6 +295,7 @@
             }
 
             speakNewHints(oldState, s);
+            if (s.word && s.current_word_id !== oldState.current_word_id) sounds.prefetchSpeech(s.word.word);
             // The controller sends a timer tick every second; redrawing the view for those
             // replays its fade/slide animations and makes the screen flash. Only redraw when
             // something other than the timer changed.

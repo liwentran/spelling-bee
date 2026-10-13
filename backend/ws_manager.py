@@ -423,7 +423,7 @@ class ConnectionManager:
             return  # Don't send state update for sound-only
 
         elif cmd_type == "PRONOUNCE_WORD":
-            # Display speaks the current word via Web Speech API; no state change
+            # Display speaks the current word (/api/tts clip, Web Speech fallback); no state change
             if state.word_details:
                 await self.broadcast(session_id, {
                     "type": "PRONOUNCE_WORD",
