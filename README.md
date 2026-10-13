@@ -111,6 +111,10 @@ A **round** is one word for each team (or player) still in the game. When everyo
 
 ## Deployment
 
+### Shared droplet
+
+This app is one of four (cafe, beli-scraper, budgeting-app, spelling-bee) that share one DigitalOcean droplet, one Postgres, and one deploy standard (CI builds the image to GHCR, then `droplet deploy` swaps in the container with a healthcheck and automatic rollback). How it all fits together, the runbook (credential renewals, restores, troubleshooting), and the guide for adding a new app live in the infra repo: **[github.com/liwentran/droplet](https://github.com/liwentran/droplet)** (`~/Developer/droplet`).
+
 Deployed at **https://bee.liwentran.com/** on a DigitalOcean droplet shared with other apps (infra and runbook: the `droplet` repo). Caddy serves the domain over https/wss and proxies to the `spelling-bee-backend` container on `127.0.0.1:8003`.
 
 ```bash

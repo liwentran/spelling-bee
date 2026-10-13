@@ -12,6 +12,24 @@ A two-screen spelling bee app. Three static pages talk to one FastAPI backend:
 
 The display and controller both take `?session=ID`, which Setup's copy-link buttons generate. The display needs it. The controller uses it to preselect and open the session, and falls back to its dropdown without it.
 
+## 🌐 Shared droplet deployment (same block in all four app repos)
+
+This app is one of four on a shared DigitalOcean droplet (`ssh droplet`, 143.244.162.12, 458 MB RAM). They share one Postgres and one deploy standard. The infra repo is the source of truth: **[github.com/liwentran/droplet](https://github.com/liwentran/droplet)** (checked out at `~/Developer/droplet`). Read its `README.md` (how it works) and `RUNBOOK.md` (credentials, renewals, restores, troubleshooting) before changing anything on the box.
+
+| App | Repo (deploy branch) | Container → loopback port | Public URL | Postgres DB |
+| --- | --- | --- | --- | --- |
+| cafe | liwentran/cafe (`main`) | `cafe-backend` → 8000 | api.liwentran.com (frontend: coffee.liwentran.com, Vercel) | `cafe` |
+| beli-scraper | liwentran/beli-scraper (`master`) | `beli-api` → 8001 | eats.liwentran.com | `beli_scraper` |
+| budgeting-app | liwentran/budgeting-app (`main`) | `budgeting-backend` → 8002 | budget.liwentran.com (frontend: Vercel) | `budgetapp` |
+| spelling-bee | liwentran/spelling-bee (`main`) | `spelling-bee-backend` → 8003 | bee.liwentran.com | `spellingbee` |
+
+- **Deploy**: push to the deploy branch (or `make deploy`). CI builds `ghcr.io/liwentran/<repo>:<sha>`, then runs `droplet deploy <repo> <sha>` over a restricted SSH key with `deploy/compose.prod.yml` on stdin. The droplet locks (one deploy at a time across all apps), validates, recreates only this app's container, waits for the healthcheck, and rolls back automatically on failure.
+- **Operate**: `make status`, `make logs`, `make rollback`, `make restart`, `make db-shell`, `make tunnel` (prod Postgres → localhost:5433). Every app has the same Makefile targets; locally each runs on its prod port against a local DB, never prod.
+- **On the droplet**: `/srv/apps/<repo>/` (`compose.yml` from CI, `.env` secrets, `data/`), `/srv/platform/` (`general-db`, backups). Caddy (`/etc/caddy/Caddyfile`, from the infra repo) is the only public entry point.
+- **Never**: droplet-wide Docker commands (`docker rm -f $(docker ps -aq)`, `docker system prune -a`, anything with `--volumes`), `build:` in prod compose, touching another app's container or database, or publishing a port on anything but `127.0.0.1`.
+- **Adding a new app** to the droplet: follow the `droplet-app` skill (`~/.claude/skills/droplet-app/SKILL.md`, source in the infra repo `skills/droplet-app/`).
+- **Expiring credential**: the droplet's GHCR pull token expires every 90 days (next: 2027-01-11). `make status` warns 14 days ahead; renew per RUNBOOK.
+
 ## Layout
 
 ```
