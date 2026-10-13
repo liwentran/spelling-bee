@@ -1,0 +1,78 @@
+# Standard droplet deploy workflow (source: liwentran droplet repo, templates/deploy.yml).
+# Copy to .github/workflows/deploy.yml and edit only the lines marked "per app".
+#
+#   build:  docker image -> ghcr.io/<owner>/<repo>:<git-sha> (+ :latest), private, GITHUB_TOKEN auth
+#   deploy: ssh with the restricted deploy key -> `droplet deploy <repo> <sha>` with
+#           deploy/compose.prod.yml on stdin. The droplet locks, pulls, health-checks, and rolls
+#           back on failure, touching only this app's containers.
+#
+# Repo secret: DROPLET_DEPLOY_KEY (private half of the restricted key; see droplet repo README).
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "deploy/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+# One run per app at a time; the droplet's lock serializes deploys across apps.
+concurrency:
+  group: deploy-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  APP: ${{ github.event.repository.name }}
+  IMAGE: ghcr.io/${{ github.repository }}
+  DROPLET_HOST: 143.244.162.12
+  DROPLET_HOST_KEY: 143.244.162.12 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH9fEYSmktHhY5inkUI+PIn6iPo3fX6kyNQwP7iStgrB
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: deploy
+
+      - name: Deploy to droplet
+        env:
+          DEPLOY_KEY: ${{ secrets.DROPLET_DEPLOY_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          echo "$DROPLET_HOST_KEY" >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "root@$DROPLET_HOST" "deploy $APP $GITHUB_SHA" < deploy/compose.prod.yml

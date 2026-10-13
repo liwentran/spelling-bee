@@ -5,8 +5,10 @@ A two-screen web app for running custom spelling bees. Open the **TV Display** o
 ## Quick Start
 
 ```bash
-# 1. Start locally (opens an SSH tunnel to the droplet DB)
-make up
+# 1. Install, then start locally (uses a local Postgres container on :5434, never prod)
+make install
+make seed   # optional: load the example sessions
+make dev
 
 # 2. Open in browser
 # Setup:      http://localhost:8003/static/setup.html
@@ -109,17 +111,18 @@ A **round** is one word for each team (or player) still in the game. When everyo
 
 ## Deployment
 
-Deployed at **https://bee.liwentran.com/** on a DigitalOcean droplet shared with other apps. Caddy serves the domain over https and proxies it to port 8003; `http://143.244.162.12:8003/` also still works, but share the https link, because some networks block port 8003 and some browsers refuse plain http. It runs in the `spelling-bee-backend` container, built from `~/spelling-bee` on the droplet.
+Deployed at **https://bee.liwentran.com/** on a DigitalOcean droplet shared with other apps (infra and runbook: the `droplet` repo). Caddy serves the domain over https/wss and proxies to the `spelling-bee-backend` container on `127.0.0.1:8003`.
 
 ```bash
-git push origin main   # make deploy refuses if the tree is dirty or unpushed
-make deploy            # git pull on the droplet + rebuild only this container
-make logs              # tail the deployed container's logs
+git push origin main   # CI builds the image, deploys it, and rolls back if it isn't healthy
+make status            # current release + health
+make logs              # follow prod logs
+make rollback          # back to the previous release
 ```
 
-- **Local edits don't go live by themselves.** Only `make deploy` updates the droplet. If a feature works locally but not at the URL above, it hasn't been deployed.
-- **Local and production share one database** (`spellingbee` in `general-db`). `make up` runs migrations on startup, so a new migration hits production as soon as you run it locally, even before the code that uses it is deployed. Keep migrations backward compatible, and deploy soon after.
-- **Backups:** a nightly cron at 3:00 AM on the droplet (`/root/cafe/backup_db.sh`) dumps every database to [`gs://liwentran.com/db_backups/`](https://console.cloud.google.com/storage/browser/liwentran.com/db_backups) and keeps 7 days locally. The spelling bee files are `spellingbee_db_<timestamp>.dump`. To restore one: `pg_restore -U postgres -d spellingbee --clean <file>`.
+- **Local edits don't go live by themselves.** A push to `main` deploys; `make deploy` re-runs the deploy without a push.
+- **Local dev has its own database**, so nothing you run locally touches production. Migrations run on prod at deploy time. Keep them backward compatible: a failed deploy rolls back the code, not the schema.
+- **Backups:** a nightly cron on the droplet dumps every database to [`gs://liwentran.com/db_backups/`](https://console.cloud.google.com/storage/browser/liwentran.com/db_backups) and keeps 7 days locally. The spelling bee files are `spellingbee_db_<timestamp>.dump`. To restore one: `pg_restore -U postgres -d spellingbee --clean <file>`.
 
 ## Defining a Session in JSON
 
@@ -218,18 +221,20 @@ Every JSON box in Setup has a **📄 Load example** button: Bulk Edit (players a
 
 ## Makefile Commands
 
+These are the standard targets every droplet app has (`make help` lists them).
+
 | Command | Description |
 |---------|-------------|
-| `make up` (or `make dev`) | Open the DB tunnel and run the app locally with reload on :8003 |
-| `make down` | Stop the local app |
-| `make tunnel` | Open the SSH tunnel to the droplet DB on :5433 |
-| `make migrate` | Run database migrations |
-| `make seed` | Migrate, then add example sessions (`backend/seed_examples.py`) |
-| `make db-shell` | Open a psql shell to the database |
-| `make db-status` | List tables in the deployed database |
-| `make deploy` | Pull `origin/main` on the droplet and rebuild the container |
-| `make logs` | Tail the deployed container's logs |
-| `make restart` | Restart the deployed container |
+| `make install` | Create `backend/.venv` and install the pinned requirements |
+| `make dev` | Run locally with reload on :8003 against the local Postgres (`local-postgres`, :5434) |
+| `make migrate` | Apply migrations to the local DB |
+| `make seed` | Migrate, then load the example sessions into the local DB |
+| `make test` | Migration round trip on a scratch DB + app import |
+| `make lint` | Ruff: syntax errors and undefined names |
+| `make deploy` | Deploy `origin/main` through CI (a push does the same) |
+| `make status` / `make logs` | Prod release + health / follow prod logs |
+| `make rollback` / `make restart` | Previous prod release / restart prod (resets live games) |
+| `make tunnel` / `make db-shell` | Prod Postgres on localhost:5433 / psql on prod |
 
 ## Credits
 

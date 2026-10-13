@@ -1,0 +1,29 @@
+# Production compose for spelling-bee, deployed by CI through `droplet deploy` (~/Developer/droplet).
+# Secrets/config come from /srv/apps/spelling-bee/.env on the droplet (DATABASE_URL).
+# bee.liwentran.com (Caddy) -> 127.0.0.1:8003
+services:
+  spelling-bee-backend:
+    image: ghcr.io/liwentran/spelling-bee:${IMAGE_TAG:?set by droplet deploy}
+    container_name: spelling-bee-backend
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8003:8000"
+    networks:
+      - dev-network
+    healthcheck:
+      # Healthy = the server answers HTTP at all (any status).
+      test: ["CMD", "python", "-c", "import urllib.request as r, urllib.error as e\ntry: r.urlopen('http://127.0.0.1:8000/', timeout=4)\nexcept e.HTTPError: pass"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  dev-network:
+    external: true

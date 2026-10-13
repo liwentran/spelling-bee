@@ -38,51 +38,38 @@ frontend/
 
 ## Running
 
-The DB is Postgres on a remote droplet (`general-db`), reached through an SSH tunnel on port 5433. `backend/.env` holds `DATABASE_URL`.
+Standard targets, the same in every droplet app (`make help`; contract in `~/Developer/droplet/README.md`):
 
-- `make up` (alias `make dev`): opens the tunnel and runs uvicorn with reload on :8003. The app is at http://localhost:8003/. Only this local server picks up edits automatically. The droplet (http://143.244.162.12:8003) changes only after push + `make deploy`, so a missing feature there usually means "not deployed".
-- `make migrate`: runs `alembic upgrade head` against the tunneled DB. Migrations also run automatically on app startup.
-- `make seed`: migrates, then runs `backend/seed_examples.py`, which loads every `examples/*.json` (matched by session name, upserted through `roster.py`). Rerunning it updates them in place. To change example data, edit the JSON, not Python. Use these sessions for manual testing, and extend the script when you add features worth demoing.
-- `make db-shell` / `make db-status`: psql on the droplet.
-- `make deploy` / `make logs` / `make restart`: see "Droplet & deployment" below.
+- `make install`: `backend/.venv` from `requirements.txt` (pinned; bump deliberately).
+- `make dev`: uvicorn with reload on :8003 against a **local** Postgres (`local-postgres` container on 127.0.0.1:5434, database `spellingbee`), never prod. The migrations alter constraints, so SQLite won't work. The app is at http://localhost:8003/. It listens on 0.0.0.0 so a phone on the LAN can be the controller.
+- `make migrate` / `make seed`: migrate the local DB; seed loads every `examples/*.json` (matched by session name, upserted through `roster.py`). Rerunning updates them in place. To change example data, edit the JSON, not Python.
+- `make test`: migration round trip (upgrade → downgrade base → upgrade) on a scratch DB, then imports the app. Run it after writing a migration.
+- `make lint`: ruff, syntax errors and undefined names only.
+- Prod: `make deploy / status / logs / rollback / restart / tunnel / db-shell` (see below).
 
 ## Droplet & deployment
 
-The app is deployed at **https://bee.liwentran.com/**. Caddy terminates TLS (with an automatic Let's Encrypt certificate) and proxies to `localhost:8003`, and WebSockets run over `wss://`. The raw `http://143.244.162.12:8003/` still answers, but always share the https URL: some networks block :8003 and some browsers force https. The droplet is shared with other apps, so **never touch their containers, directories, databases, Caddy config, or cron.**
+Live at **https://bee.liwentran.com/**. The droplet (`ssh droplet`, 458 MB RAM, shared with three other apps) is managed by the infra repo **`~/Developer/droplet`**. Read its README before changing anything there.
 
-- SSH alias `droplet` (`root@143.244.162.12`, in `~/.ssh/config`). The box is tiny: 458 MB RAM, swap in use, about 2.8 GB disk free. Keep images slim and avoid running builds you don't need.
-- Use `docker-compose` (v5, hyphenated). `docker compose` isn't installed.
-- All app containers join the external Docker network `dev-network`.
+**Deploying:** push to `main`. GitHub Actions ([deploy.yml](.github/workflows/deploy.yml)):
+1. builds `backend/Dockerfile` from the repo root (backend + `frontend/` baked in) and pushes `ghcr.io/liwentran/spelling-bee:<sha>`;
+2. runs `droplet deploy spelling-bee <sha>` over a restricted SSH key, sending [deploy/compose.prod.yml](deploy/compose.prod.yml).
 
-| Port | Container | Source dir on droplet | DB | Deploy style |
-|------|-----------|-----------------------|----|--------------|
-| 5432 (internal, 172.18.0.3) | `general-db` (postgres:15) | – | cafe, wyomb_cafe, budgetapp, beli_scraper, spellingbee | – |
-| 8000 | `cafe-backend` | `~/cafe` | cafe | GitHub Actions → Docker Hub `liwentran/cafe-backend` → ssh restart |
-| 8001 | `beli-api` | `~/beli-scraper` | beli_scraper | compose build on box |
-| 8002 | `budgeting-backend` | `~/budgeting-app` | budgetapp | git clone + compose build on box |
-| 8003 (`bee.liwentran.com` via Caddy) | `spelling-bee-backend` | `~/spelling-bee` | spellingbee | git clone + compose build on box (this repo) |
+The droplet takes a box-wide deploy lock, pulls, waits for the healthcheck, and **rolls back automatically** if the new release isn't healthy. `make deploy` re-runs the workflow without a push. `make rollback` returns to the previous release.
 
-- Caddy (`/etc/caddy/Caddyfile`) proxies `api.liwentran.com` → :8000, `eats.liwentran.com` → :8001 and `bee.liwentran.com` → :8003. It proxies WebSockets automatically, and `ws.js` switches to `wss:` under https.
-  - To change it, back up the file (`Caddyfile.bak-<date>` sits next to it), edit only this app's block, run `caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`, then `systemctl reload caddy`. The reload is graceful, so other sites stay up.
-  - DNS for liwentran.com is at Squarespace Domains (formerly Google Domains). `bee` is an A record → 143.244.162.12.
-- `general-db` doesn't publish 5432. Locally you reach it through the tunnel `ssh -L 5433:172.18.0.3:5432 droplet` (`make tunnel`).
-- Backups: root cron runs `/root/cafe/backup_db.sh` at 3:00 AM. It dumps **every database** in `general-db` (`<db>_db_<ts>.dump`, plus `globals_<ts>.sql` for roles) to `/root/cafe/backups` (kept 7 days) and `gs://liwentran.com/db_backups/` (console: https://console.cloud.google.com/storage/browser/liwentran.com/db_backups). The script's source copy is `~/Developer/wyomb-cafe/backup_db.sh`, which isn't tracked in git.
-- The wyomb-cafe repo (`~/Developer/wyomb-cafe`) is the cafe app: FastAPI + SvelteKit, with its frontend on Vercel at coffee.liwentran.com.
-
-**Deploying this app.** Push to `origin/main` (https://github.com/liwentran/spelling-bee, public), then run `make deploy`. It refuses to run if the tree is dirty or unpushed. Otherwise it runs `git pull --ff-only && docker-compose up -d --build --no-deps spelling-bee-backend` in `~/spelling-bee`.
-- The backend is baked into the image, so code changes need the rebuild. `./frontend` is bind-mounted at `/frontend`, so static files go live on `git pull` alone.
-- Migrations run on container startup against `general-db:5432/spellingbee`.
-- Only ever target the `spelling-bee-backend` service: always `--no-deps`, never `down`, `docker system prune`, or a bare `up` that could touch other projects.
-- Run a single uvicorn worker with no `--reload`, because `GameState` is in memory and a restart resets live games.
+- Prod config lives in `deploy/compose.prod.yml` (versioned) plus `/srv/apps/spelling-bee/.env` on the droplet (`DATABASE_URL`). Nothing is built on the droplet.
+- Static files are in the image now, so frontend changes also need a deploy (no more bind mount).
+- The container binds `127.0.0.1:8003` only; Caddy serves `bee.liwentran.com` over https/wss. The raw `http://<ip>:8003` URL no longer works.
+- Migrations run on container startup against `general-db:5432/spellingbee`. A migration must keep the *currently deployed* code working (add columns with `server_default`, don't drop/rename what old code reads), because a failed healthcheck rolls the code back but not the schema.
+- One uvicorn worker, no `--reload`: `GameState` is in memory and a restart resets live games.
+- Prod DB: `make db-shell`, or `make tunnel` (→ localhost:5433). Backups: nightly dump of every DB, see the droplet repo (`spellingbee_db_<ts>.dump`).
 
 ## Testing
 
-There is no test suite. Verify changes against a throwaway DB, never the real one.
+There is no test suite beyond `make test` (migration round trip + import). Local dev uses its own Postgres, so nothing you do locally touches production.
 
-**⚠ The real DB is shared with production.** Local `make up` (via the tunnel) and the droplet container both use `general-db/spellingbee`. `make up` runs with `--reload`, and the app runs `alembic upgrade head` on every startup. So **while `make up` is running, saving a new migration or model change under `backend/` immediately migrates the production DB**, possibly halfway through your edits. Either stop `make up` first, or develop in a copy (`rsync -a --exclude .venv --exclude __pycache__ backend frontend <scratch>/work/`) and copy the files back only once they're tested, migration file first. New migrations must also keep the *currently deployed* code working: add columns with `server_default`, and don't drop or rename anything the old code reads.
-
-1. Start a throwaway Postgres: `initdb` + `pg_ctl -o "-p 5499 -k ''"` (TCP only; macOS limits socket path length).
-2. Point `DATABASE_URL` at it and run `alembic upgrade head`. Then `downgrade -1` and `upgrade head` to test the round trip, and check `alembic_version` at each step rather than trusting the log output.
+1. `make test` after any migration. For a single step, `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5434/spellingbee_test backend/.venv/bin/alembic downgrade -1`, and check `alembic_version` rather than trusting the log output.
+2. New migrations must keep the *currently deployed* code working (see above).
 3. Use FastAPI `TestClient` (`PYTHONPATH=. uv run --no-project --with-requirements requirements.txt --with httpx2 python test.py`) for REST and WS.
 4. For UI flows, use Playwright (`uv run --with playwright`). Drive setup, controller and display as three pages at once, capture what the TV says by wrapping `HTMLMediaElement.prototype.play` (speech is `/api/tts?text=` clips) and stubbing `SpeechSynthesis.prototype.speak` (the fallback), and remember `innerText` applies CSS `uppercase`.
 5. After rebuilding the examples with `make seed`, smoke-test http://localhost:8003/.
