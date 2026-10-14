@@ -41,6 +41,8 @@ You need three screens. They don't have to be on the same device, but they must 
 
 ### 1. Before the game (Setup page)
 
+If no one has used the app for a while, the first page you open shows **"Starting Spelling Bee…"** for up to about half a minute, then opens by itself.
+
 1. Click **+ New Session**. Enter a name, set the timer (seconds per word), and tick **Elimination Mode** if a miss knocks you out. Choose **👤 Individual** or **👥 Team**, then click **Create**.
 2. Click the session in the list to open it. Setup reopens the last session you used. You can change **⏱ Time per word** at the top at any time.
 3. **Team game only:** click **+ Add Team** for each team. Give it a name and pick a color.
@@ -116,6 +118,8 @@ A **round** is one word for each team (or player) still in the game. When everyo
 This app is one of four (cafe, beli-scraper, budgeting-app, spelling-bee) that share one DigitalOcean droplet, one Postgres, and one deploy standard (CI builds the image to GHCR, then `droplet deploy` swaps in the container with a healthcheck and automatic rollback). How it all fits together, the runbook (credential renewals, restores, troubleshooting), and the guide for adding a new app live in the infra repo: **[github.com/liwentran/droplet](https://github.com/liwentran/droplet)** (`~/Developer/droplet`).
 
 Deployed at **https://bee.liwentran.com/** on a DigitalOcean droplet shared with other apps (infra and runbook: the `droplet` repo). Caddy serves the domain over https/wss and proxies to the `spelling-bee-backend` container on `127.0.0.1:8003`.
+
+To save memory, the app **sleeps after 15 minutes with nobody connected**. The next visit shows a "Starting Spelling Bee…" page for up to about half a minute, then opens the app by itself. It never sleeps during a game, because an open TV or controller page keeps it awake. Scores and rounds are saved in the database either way.
 
 ```bash
 git push origin main   # CI builds the image, deploys it, and rolls back if it isn't healthy

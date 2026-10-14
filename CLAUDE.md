@@ -82,6 +82,7 @@ The droplet takes a box-wide deploy lock, pulls, waits for the healthcheck, and 
 - The container binds `127.0.0.1:8003` only; Caddy serves `bee.liwentran.com` over https/wss. The raw `http://<ip>:8003` URL no longer works.
 - Migrations run on container startup against `general-db:5432/spellingbee`. A migration must keep the *currently deployed* code working (add columns with `server_default`, don't drop/rename what old code reads), because a failed healthcheck rolls the code back but not the schema.
 - One uvicorn worker, no `--reload`: `GameState` is in memory and a restart resets live games.
+- **The app sleeps when idle** (droplet README → "Apps that sleep when idle"; `/srv/apps/spelling-bee/.idle`, and `import sleeps_when_idle` in the Caddyfile). After 15 minutes with no connections to :8003, the container is stopped. The next request gets a "Starting Spelling Bee…" page (HTTP 503 with `X-Droplet-Waking`) that reloads into the app once it's up. A cold start takes about 15–40 s on this box. An open TV or phone WebSocket counts as a connection, so the app never sleeps during a game. When it does sleep, only `GameState` (the current selection and `hide_word`) is lost; scores and rounds are in the DB. `make status` showing `Exited (0)` with `asleep` is normal. Wake it before `docker exec`.
 - Prod DB: `make db-shell`, or `make tunnel` (→ localhost:5433). Backups: nightly dump of every DB, see the droplet repo (`spellingbee_db_<ts>.dump`).
 
 ## Testing
