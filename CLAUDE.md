@@ -12,9 +12,9 @@ A two-screen spelling bee app. Three static pages talk to one FastAPI backend:
 
 The display and controller both take `?session=ID`, which Setup's copy-link buttons generate. The display needs it. The controller uses it to preselect and open the session, and falls back to its dropdown without it.
 
-## 🌐 Shared droplet deployment (same block in all four app repos)
+## 🌐 Shared droplet deployment (same block in every app repo)
 
-This app is one of four on a shared DigitalOcean droplet (`ssh droplet`, 143.244.162.12, 458 MB RAM). They share one Postgres and one deploy standard. The infra repo is the source of truth: **[github.com/liwentran/droplet](https://github.com/liwentran/droplet)** (checked out at `~/Developer/droplet`). Read its `README.md` (how it works) and `RUNBOOK.md` (credentials, renewals, restores, troubleshooting) before changing anything on the box.
+This app is one of six on a shared DigitalOcean droplet (`ssh droplet`, 143.244.162.12, 458 MB RAM). They share one Postgres and one deploy standard. The infra repo is the source of truth: **[github.com/liwentran/droplet](https://github.com/liwentran/droplet)** (checked out at `~/Developer/droplet`). Read its `README.md` (how it works) and `RUNBOOK.md` (credentials, renewals, restores, troubleshooting) before changing anything on the box.
 
 | App | Repo (deploy branch) | Container → loopback port | Public URL | Postgres DB |
 | --- | --- | --- | --- | --- |
@@ -22,6 +22,8 @@ This app is one of four on a shared DigitalOcean droplet (`ssh droplet`, 143.244
 | beli-scraper | liwentran/beli-scraper (`master`) | `beli-api` → 8001 | eats.liwentran.com | `beli_scraper` |
 | budgeting-app | liwentran/budgeting-app (`main`) | `budgeting-backend` → 8002 | budget.liwentran.com (frontend: Vercel) | `budgetapp` |
 | spelling-bee | liwentran/spelling-bee (`main`) | `spelling-bee-backend` → 8003 | bee.liwentran.com | `spellingbee` |
+| personal | liwentran/personal (`main`) | `personal-web` → 8004 | liwentran.com (www redirects) | none |
+| notes-v3 | liwentran/notes-v3 (`main`) | `notes-v3-api` → 8005 | notes-api.liwentran.com (frontend: notes.liwentran.com, Vercel) | none (data: liwentran/journal git repo) |
 
 - **Deploy**: push to the deploy branch (or `make deploy`). CI builds `ghcr.io/liwentran/<repo>:<sha>`, then runs `droplet deploy <repo> <sha>` over a restricted SSH key with `deploy/compose.prod.yml` on stdin. The droplet locks (one deploy at a time across all apps), validates, recreates only this app's container, waits for the healthcheck, and rolls back automatically on failure.
 - **Operate**: `make status`, `make logs`, `make rollback`, `make restart`, `make db-shell`, `make tunnel` (prod Postgres → localhost:5433). Every app has the same Makefile targets; locally each runs on its prod port against a local DB, never prod.
