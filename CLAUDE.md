@@ -18,12 +18,12 @@ This app is one of six on a shared DigitalOcean droplet (`ssh droplet`, 143.244.
 
 | App | Repo (deploy branch) | Container → loopback port | Public URL | Postgres DB |
 | --- | --- | --- | --- | --- |
-| cafe | liwentran/cafe (`main`) | `cafe-backend` → 8000 | api.liwentran.com (frontend: coffee.liwentran.com, Vercel) | `cafe` |
+| cafe | liwentran/cafe (`main`) | `cafe-backend` → 8000 | coffee.liwentran.com (SPA + API at `/api/proxy`; api.liwentran.com = same app) | `cafe` |
 | beli-scraper | liwentran/beli-scraper (`master`) | `beli-api` → 8001 | eats.liwentran.com | `beli_scraper` |
-| budgeting-app | liwentran/budgeting-app (`main`) | `budgeting-backend` → 8002 | budget.liwentran.com (frontend: Vercel) | `budgetapp` |
+| budgeting-app | liwentran/budgeting-app (`main`) | `budgeting-backend` → 8002 | budget.liwentran.com (SPA + `/api`; budget-api.liwentran.com = same app) | `budgetapp` |
 | spelling-bee | liwentran/spelling-bee (`main`) | `spelling-bee-backend` → 8003 | bee.liwentran.com | `spellingbee` |
 | personal | liwentran/personal (`main`) | `personal-web` → 8004 | liwentran.com (www redirects) | none |
-| notes-v3 | liwentran/notes-v3 (`main`) | `notes-v3-api` → 8005 | notes-api.liwentran.com (frontend: notes.liwentran.com, Vercel) | none (data: liwentran/journal git repo) |
+| notes-v3 | liwentran/notes-v3 (`main`) | `notes-v3-api` → 8005, `notes-v3-web` → 8006 | notes.liwentran.com (website), notes-api.liwentran.com (API) | none (data: liwentran/journal git repo) |
 
 - **Deploy**: push to the deploy branch (or `make deploy`). CI builds `ghcr.io/liwentran/<repo>:<sha>`, then runs `droplet deploy <repo> <sha>` over a restricted SSH key with `deploy/compose.prod.yml` on stdin. The droplet locks (one deploy at a time across all apps), validates, recreates only this app's container, waits for the healthcheck, and rolls back automatically on failure.
 - **Operate**: `make status`, `make logs`, `make rollback`, `make restart`, `make db-shell`, `make tunnel` (prod Postgres → localhost:5433). Every app has the same Makefile targets; locally each runs on its prod port against a local DB, never prod.
